@@ -695,7 +695,7 @@ namespace osu.Game.Rulesets.Hikariii.Features.Player.Screens.LLin
                     Name = "覆盖层",
                     Children =
                     [
-                        new GlobalScrollAdjustsVolume()
+                        new ScrollAdjustsVolume()
                     ]
                 }
             ];
