@@ -11,7 +11,7 @@ permissions:
 jobs:
   inspect-code:
     name: Code Quality
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -37,6 +37,7 @@ jobs:
         run: dotnet build -c Debug -warnaserror osu.Desktop.slnf -p:EnforceCodeStyleInBuild=true
 
       - name: CodeFileSanity
+        shell: bash
         run: |
           # TODO: Add ignore filters and GitHub Workflow Command Reporting in CFS. That way we don't have to do this workaround.
           # FIXME: Suppress warnings from templates project
@@ -70,9 +71,6 @@ jobs:
        matrix:
           os:
             - { prettyname: Windows, fullname: windows-latest }
-            # macOS runner performance has gotten unbearably slow so let's turn them off temporarily.
-            # - { prettyname: macOS, fullname: macos-latest }
-            - { prettyname: Linux, fullname: ubuntu-latest }
           threadingMode: ['SingleThread', 'MultiThreaded']
     timeout-minutes: 120
     steps:
@@ -101,7 +99,7 @@ jobs:
 
   test-results:
     name: Test results
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     # we want to wait for the `test` job to complete, but run regardless of whether it succeeds or fails
     # https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#example-not-requiring-successful-dependent-jobs
     if: ${{ !cancelled() }}
@@ -127,46 +125,35 @@ jobs:
           list-tests: 'failed'
           use-actions-summary: 'true'
 
-  build-only-android:
-    name: Build only (Android)
+  windows-build:
+    name: Windows build (win-x64)
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Setup JDK 11
-        uses: actions/setup-java@v5
-        with:
-          distribution: microsoft
-          java-version: 11
-
       - name: Install .NET 10.0.x
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
 
-      - name: Install .NET workloads
-        run: dotnet workload install android
+      - name: Publish
+        run: dotnet publish osu.Desktop/osu.Desktop.csproj -c Release -r win-x64 --self-contained true -o publish
 
-      - name: Compile
-        run: dotnet build -c Debug osu.Android.slnf
+      - name: Check that the bundled LLin plugin made it into the output
+        shell: bash
+        run: |
+          for f in osu.Game.Rulesets.Hikariii.dll LLin.OSIntegrations.dll M.Resources.dll zh/M.Resources.resources.dll; do
+            if [ ! -f "publish/$f" ]; then
+              echo "::error::bundled plugin file missing from publish output: $f"
+              exit 1
+            fi
+          done
+          echo "bundled LLin plugin present in publish output."
 
-  build-only-ios:
-    name: Build only (iOS)
-    runs-on: xcode-27
-    timeout-minutes: 60
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Install .NET 10.0.x
-        uses: actions/setup-dotnet@v5
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v7
         with:
-          dotnet-version: "10.0.x"
-
-      - name: Install .NET Workloads
-        run: dotnet workload install ios
-
-      - name: Build
-        run: dotnet build -c Debug osu.iOS.slnf
+          name: ZPosu-win-x64
+          path: publish/
