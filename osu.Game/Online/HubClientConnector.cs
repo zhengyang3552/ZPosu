@@ -79,7 +79,6 @@ namespace osu.Game.Online
         async Task IHubClientConnector.Disconnect()
         {
             await Disconnect().ConfigureAwait(false);
-            API.Logout();
         }
 
         protected override string ClientName { get; }

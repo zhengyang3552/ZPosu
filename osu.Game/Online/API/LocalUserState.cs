@@ -1,15 +1,10 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Diagnostics;
 using System.Linq;
 using osu.Framework.Bindables;
-using osu.Framework.Development;
 using osu.Framework.Graphics;
-using osu.Framework.Logging;
-using osu.Framework.Threading;
 using osu.Game.Configuration;
-using osu.Game.Extensions;
 using osu.Game.Online.API.Requests;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Users;
@@ -25,14 +20,12 @@ namespace osu.Game.Online.API
 
         private readonly IAPIProvider api;
 
-        private readonly Bindable<APIUser> localUser = new Bindable<APIUser>(createGuestUser());
+        private readonly Bindable<APIUser> localUser = new Bindable<APIUser>(new GuestUser());
         private readonly BindableList<APIRelation> friends = new BindableList<APIRelation>();
         private readonly BindableList<APIRelation> blocks = new BindableList<APIRelation>();
         private readonly BindableList<int> favouriteBeatmapSets = new BindableList<int>();
 
         #region Config settings synced from online
-
-        private bool populatingSettings;
 
         private readonly Bindable<UserStatus> configStatus = new Bindable<UserStatus>();
         private readonly Bindable<bool> configSupporter = new Bindable<bool>();
@@ -48,119 +41,7 @@ namespace osu.Game.Online.API
             config.BindWith(OsuSetting.WasSupporter, configSupporter);
 
             config.BindWith(OsuSetting.PMFriendsOnly, configPMFriendsOnly);
-            configPMFriendsOnly.BindValueChanged(_ => scheduleSettingSyncToWeb());
         }
-
-        #region Logging in / out
-
-        private static APIUser createGuestUser() => new GuestUser();
-
-        /// <summary>
-        /// Show a placeholder user if saved credentials are available.
-        /// This is useful for storing local scores and showing a placeholder username after starting the game,
-        /// until a valid connection has been established.
-        /// </summary>
-        public void SetPlaceholderLocalUser(string username)
-        {
-            if (!localUser.IsDefault)
-                return;
-
-            localUser.Value = new APIUser
-            {
-                Username = username,
-                IsSupporter = configSupporter.Value,
-            };
-        }
-
-        public void SetLocalUser(APIMe me)
-        {
-            localUser.Value = me;
-
-            syncSettingsFromWeb(me);
-            UpdateFriends();
-            UpdateBlocks();
-            UpdateFavouriteBeatmapSets();
-        }
-
-        public void ClearLocalUser()
-        {
-            // Reset the status to be broadcast on the next login, in case multiple players share the same system.
-            configStatus.Value = UserStatus.Online;
-
-            // Scheduled prior to state change such that the state changed event is invoked with the correct user and their friends present
-            Schedule(() =>
-            {
-                localUser.Value = createGuestUser();
-                configSupporter.Value = false;
-                friends.Clear();
-                blocks.Clear();
-                favouriteBeatmapSets.Clear();
-            });
-        }
-
-        #endregion
-
-        #region Setting sync between web and client
-
-        private void syncSettingsFromWeb(APIMe me)
-        {
-            Debug.Assert(ThreadSafety.IsUpdateThread);
-
-            populatingSettings = true;
-
-            configSupporter.Value = me.IsSupporter;
-
-            // `last_visit` is assumed to be `null` if and only if the web-side "hide online presence toggle" is enabled
-            if (me.LastVisit == null)
-                configStatus.Value = UserStatus.Offline;
-
-            configPMFriendsOnly.Value = me.PMFriendsOnly;
-
-            populatingSettings = false;
-        }
-
-        private void syncSettingsToWeb()
-        {
-            Debug.Assert(ThreadSafety.IsUpdateThread);
-
-            if (!api.IsLoggedIn || populatingSettings)
-                return;
-
-            var request = new UpdateUserOptionsRequest
-            {
-                UserSettings = new UpdateUserOptionsRequest.UserSettingUpdate
-                {
-                    PMFriendsOnly = configPMFriendsOnly.Value
-                }
-            };
-            request.Success += me =>
-            {
-                if (!api.IsLoggedIn || !me.MatchesOnlineID(localUser.Value))
-                    return;
-
-                syncSettingsFromWeb(me);
-            };
-            request.Failure += ex =>
-            {
-                if (!api.IsLoggedIn)
-                    return;
-
-                Logger.Error(ex, @"Failed to synchronise setting");
-                if (localUser.Value is APIMe oldMe)
-                    syncSettingsFromWeb(oldMe);
-            };
-            api.Queue(request);
-        }
-
-        private ScheduledDelegate? scheduledSync;
-
-        private void scheduleSettingSyncToWeb()
-        {
-            scheduledSync?.Cancel();
-            scheduledSync = Scheduler.AddDelayed(syncSettingsToWeb, 500);
-        }
-
-        #endregion
 
         public void UpdateFriends()
         {

@@ -69,27 +69,9 @@ namespace osu.Game.Configuration
             SetDefault(OsuSetting.SongSelectBackgroundBlur, false);
 
             // Online settings
-            SetDefault(OsuSetting.Username, string.Empty);
-            SetDefault(OsuSetting.Token, string.Empty);
-
+            // Note: account credentials (username / token / save-password flags) deliberately have no
+            // configuration entries. This build forces guest mode and never persists account state.
             SetDefault(OsuSetting.AutomaticallyDownloadMissingBeatmaps, true);
-
-            SetDefault(OsuSetting.SavePassword, true).ValueChanged += enabled =>
-            {
-                if (enabled.NewValue)
-                    SetValue(OsuSetting.SaveUsername, true);
-                else
-                    GetBindable<string>(OsuSetting.Token).SetDefault();
-            };
-
-            SetDefault(OsuSetting.SaveUsername, true).ValueChanged += enabled =>
-            {
-                if (!enabled.NewValue)
-                {
-                    GetBindable<string>(OsuSetting.Username).SetDefault();
-                    SetValue(OsuSetting.SavePassword, false);
-                }
-            };
 
             SetDefault(OsuSetting.ExternalLinkWarning, true);
             SetDefault(OsuSetting.PreferNoVideo, false);
@@ -248,12 +230,6 @@ namespace osu.Game.Configuration
 
         protected override bool CheckLookupContainsPrivateInformation(OsuSetting lookup)
         {
-            switch (lookup)
-            {
-                case OsuSetting.Token:
-                    return true;
-            }
-
             return false;
         }
 
@@ -333,7 +309,6 @@ namespace osu.Game.Configuration
     public enum OsuSetting
     {
         Ruleset,
-        Token,
         MenuCursorSize,
         GameplayCursorSize,
         AutoCursorSize,
@@ -380,10 +355,7 @@ namespace osu.Game.Configuration
         BeatmapDetailTab,
         BeatmapLeaderboardSortMode,
         BeatmapDetailModsFilter,
-        Username,
         ReleaseStream,
-        SavePassword,
-        SaveUsername,
         DisplayStarsMinimum,
         DisplayStarsMaximum,
         SongSelectGroupMode,

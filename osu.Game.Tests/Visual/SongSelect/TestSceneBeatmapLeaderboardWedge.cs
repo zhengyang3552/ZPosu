@@ -1,4 +1,4 @@
-// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
@@ -17,6 +17,7 @@ using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics.Cursor;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Overlays;
@@ -214,7 +215,7 @@ namespace osu.Game.Tests.Visual.SongSelect
         {
             BeatmapInfo beatmapInfo = null!;
 
-            AddStep("Log out", () => API.Logout());
+            AddStep("Log out", () => ((DummyAPIAccess)API).LogoutDummyUser());
             setScope(BeatmapLeaderboardScope.Local);
 
             AddStep(@"Import beatmap", () =>

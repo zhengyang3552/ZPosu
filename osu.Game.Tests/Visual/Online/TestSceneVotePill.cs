@@ -21,9 +21,6 @@ namespace osu.Game.Tests.Visual.Online
         [Cached]
         private readonly OverlayColourProvider colourProvider = new OverlayColourProvider(OverlayColourScheme.Blue);
 
-        [Cached]
-        private LoginOverlay login;
-
         private TestPill votePill;
         private readonly Container pillContainer;
 
@@ -37,14 +34,12 @@ namespace osu.Game.Tests.Visual.Online
                     Origin = Anchor.Centre,
                     AutoSizeAxes = Axes.Both
                 },
-                login = new LoginOverlay()
             });
         }
 
         [Test]
         public void TestUserCommentPill()
         {
-            AddStep("Hide login overlay", () => login.Hide());
             AddStep("Log in", logIn);
             AddStep("User comment", () => addVotePill(getUserComment()));
             AddAssert("Background is transparent", () => votePill.Background.Alpha == 0);
@@ -55,7 +50,6 @@ namespace osu.Game.Tests.Visual.Online
         [Test]
         public void TestRandomCommentPill()
         {
-            AddStep("Hide login overlay", () => login.Hide());
             AddStep("Log in", logIn);
             AddStep("Random comment", () => addVotePill(getRandomComment()));
             AddAssert("Background is visible", () => votePill.Background.Alpha == 1);
@@ -66,18 +60,13 @@ namespace osu.Game.Tests.Visual.Online
         [Test]
         public void TestOfflineRandomCommentPill()
         {
-            AddStep("Hide login overlay", () => login.Hide());
-            AddStep("Log out", API.Logout);
+            AddStep("Log out", () => ((DummyAPIAccess)API).LogoutDummyUser());
             AddStep("Random comment", () => addVotePill(getRandomComment()));
             AddStep("Click", () => votePill.TriggerClick());
-            AddAssert("Login overlay is visible", () => login.State.Value == Visibility.Visible);
+            AddAssert("Not loading", () => !votePill.IsLoading);
         }
 
-        private void logIn()
-        {
-            API.Login("localUser", "password");
-            ((DummyAPIAccess)API).AuthenticateSecondFactor("abcdefgh");
-        }
+        private void logIn() => ((DummyAPIAccess)API).LoginAsDummyUser("localUser");
 
         private Comment getUserComment() => new Comment
         {

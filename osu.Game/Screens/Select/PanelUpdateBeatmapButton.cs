@@ -50,9 +50,6 @@ namespace osu.Game.Screens.Select
         private IAPIProvider api { get; set; } = null!;
 
         [Resolved]
-        private LoginOverlay? loginOverlay { get; set; }
-
-        [Resolved]
         private IDialogOverlay? dialogOverlay { get; set; }
 
         public PanelUpdateBeatmapButton()
@@ -155,7 +152,7 @@ namespace osu.Game.Screens.Select
 
             if (!api.IsLoggedIn)
             {
-                loginOverlay?.Show();
+                // Guest mode: there is no account system, so beatmap updates are unavailable.
                 return;
             }
 

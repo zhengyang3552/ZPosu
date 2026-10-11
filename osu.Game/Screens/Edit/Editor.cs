@@ -112,10 +112,6 @@ namespace osu.Game.Screens.Edit
         [Resolved(canBeNull: true)]
         private INotificationOverlay notifications { get; set; }
 
-        [Resolved(canBeNull: true)]
-        [CanBeNull]
-        private LoginOverlay loginOverlay { get; set; }
-
         [Resolved]
         private RealmAccess realm { get; set; }
 
@@ -1409,7 +1405,7 @@ namespace osu.Game.Screens.Edit
         {
             if (api.State.Value != APIState.Online)
             {
-                loginOverlay?.Show();
+                // Guest mode: there is no account system, so beatmap submission is unavailable.
                 return;
             }
 

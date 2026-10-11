@@ -1,4 +1,4 @@
-// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 #nullable disable
@@ -84,7 +84,7 @@ namespace osu.Game.Tests.Scores.IO
                     var osu = LoadOsuIntoHost(host, true);
 
                     if (!isLocalUser)
-                        osu.API.Logout();
+                        ((DummyAPIAccess)osu.API).LogoutDummyUser();
 
                     var beatmap = BeatmapImportHelper.LoadOszIntoOsu(osu, TestResources.GetQuickTestBeatmapForImport()).GetResultSafely();
                     var beatmapInfo = beatmap.Beatmaps.First();

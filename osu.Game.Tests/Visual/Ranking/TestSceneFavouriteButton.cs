@@ -48,13 +48,9 @@ namespace osu.Game.Tests.Visual.Ranking
         [Test]
         public void TestLoggedOutIn()
         {
-            AddStep("log out", () => API.Logout());
+            AddStep("log out", () => dummyAPI.LogoutDummyUser());
             checkEnabled(false);
-            AddStep("log in", () =>
-            {
-                API.Login("test", "test");
-                ((DummyAPIAccess)API).AuthenticateSecondFactor("abcdefgh");
-            });
+            AddStep("log in", () => dummyAPI.LoginAsDummyUser("test"));
             checkEnabled(true);
         }
 
@@ -66,11 +62,7 @@ namespace osu.Game.Tests.Visual.Ranking
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
             });
-            AddStep("log in", () =>
-            {
-                API.Login("test", "test");
-                ((DummyAPIAccess)API).AuthenticateSecondFactor("abcdefgh");
-            });
+            AddStep("log in", () => dummyAPI.LoginAsDummyUser("test"));
             checkEnabled(false);
         }
 

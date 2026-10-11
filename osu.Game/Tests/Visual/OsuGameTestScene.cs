@@ -178,9 +178,6 @@ namespace osu.Game.Tests.Visual
                 LocalConfig.SetValue(OsuSetting.IntroSequence, IntroSequence.Circles);
                 LocalConfig.SetValue(OsuSetting.ShowFirstRunSetup, false);
 
-                API.Login("Rhythm Champion", "osu!");
-                ((DummyAPIAccess)API).AuthenticateSecondFactor("abcdefgh");
-
                 Dependencies.Get<SessionStatics>().SetValue(Static.MutedAudioNotificationShownOnce, true);
 
                 // set applied version to latest so that the BackgroundBeatmapProcessor doesn't consider

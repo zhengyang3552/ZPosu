@@ -42,9 +42,6 @@ namespace osu.Game.Overlays.Comments
         [Resolved]
         protected IAPIProvider API { get; private set; } = null!;
 
-        [Resolved]
-        private LoginOverlay? loginOverlay { get; set; }
-
         private readonly IBindable<APIState> apiState = new Bindable<APIState>();
 
         /// <summary>
@@ -144,7 +141,8 @@ namespace osu.Game.Overlays.Comments
                                                 logInButton = new EditorButton
                                                 {
                                                     Width = 100,
-                                                    Action = () => loginOverlay?.Show(),
+                                                    // Guest mode: there is no account system to send the user to.
+                                                    Action = () => { },
                                                     Text = GetButtonText(false)
                                                 }
                                             }

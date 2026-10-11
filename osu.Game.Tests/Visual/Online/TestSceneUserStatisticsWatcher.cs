@@ -1,4 +1,4 @@
-// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
@@ -172,17 +172,13 @@ namespace osu.Game.Tests.Visual.Online
 
             feignScoreProcessing(userId, ruleset, 5_000_000);
 
-            AddStep("log out user", () => dummyAPI.Logout());
+            AddStep("log out user", () => dummyAPI.LogoutDummyUser());
 
             AddStep("signal score processed", () => ((ISpectatorClient)spectatorClient).UserScoreProcessed(userId, scoreId));
             AddWaitStep("wait a bit", 5);
             AddAssert("update not received", () => update == null);
 
-            AddStep("log in user", () =>
-            {
-                dummyAPI.Login("user", "password");
-                dummyAPI.AuthenticateSecondFactor("abcdefgh");
-            });
+            AddStep("log in user", () => dummyAPI.LoginAsDummyUser("user"));
         }
 
         [Test]

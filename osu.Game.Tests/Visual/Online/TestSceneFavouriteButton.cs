@@ -33,24 +33,16 @@ namespace osu.Game.Tests.Visual.Online
         public void TestLoggedOutIn()
         {
             AddStep("set valid beatmap", () => favourite.BeatmapSet.Value = new APIBeatmapSet { OnlineID = 88 });
-            AddStep("log out", () => API.Logout());
+            AddStep("log out", () => ((DummyAPIAccess)API).LogoutDummyUser());
             checkEnabled(false);
-            AddStep("log in", () =>
-            {
-                API.Login("test", "test");
-                ((DummyAPIAccess)API).AuthenticateSecondFactor("abcdefgh");
-            });
+            AddStep("log in", () => ((DummyAPIAccess)API).LoginAsDummyUser("test"));
             checkEnabled(true);
         }
 
         [Test]
         public void TestBeatmapChange()
         {
-            AddStep("log in", () =>
-            {
-                API.Login("test", "test");
-                ((DummyAPIAccess)API).AuthenticateSecondFactor("abcdefgh");
-            });
+            AddStep("log in", () => ((DummyAPIAccess)API).LoginAsDummyUser("test"));
             AddStep("set valid beatmap", () => favourite.BeatmapSet.Value = new APIBeatmapSet { OnlineID = 88 });
             checkEnabled(true);
             AddStep("set invalid beatmap", () => favourite.BeatmapSet.Value = new APIBeatmapSet());

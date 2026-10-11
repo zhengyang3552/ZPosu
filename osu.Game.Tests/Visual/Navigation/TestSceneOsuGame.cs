@@ -48,9 +48,7 @@ namespace osu.Game.Tests.Visual.Navigation
             typeof(SettingsOverlay),
             typeof(UserProfileOverlay),
             typeof(BeatmapSetOverlay),
-            typeof(LoginOverlay),
             typeof(MusicController),
-            typeof(AccountCreationOverlay),
             typeof(IDialogOverlay),
             typeof(ScreenshotManager)
         };

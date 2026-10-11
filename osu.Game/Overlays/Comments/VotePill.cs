@@ -35,9 +35,6 @@ namespace osu.Game.Overlays.Comments
         [Resolved]
         private IAPIProvider api { get; set; }
 
-        [Resolved(canBeNull: true)]
-        private LoginOverlay login { get; set; }
-
         [Resolved]
         private OverlayColourProvider colourProvider { get; set; }
 
@@ -88,11 +85,9 @@ namespace osu.Game.Overlays.Comments
 
         private void onAction()
         {
+            // Guest mode: there is no account system, so voting is unavailable.
             if (!api.IsLoggedIn)
-            {
-                login?.Show();
                 return;
-            }
 
             request = new CommentVoteRequest(comment.Id, isVoted.Value ? CommentVoteAction.UnVote : CommentVoteAction.Vote);
             request.Success += onSuccess;

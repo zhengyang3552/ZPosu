@@ -12,7 +12,6 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
-using osu.Game.Overlays;
 using osu.Game.Rulesets;
 using osu.Game.Tournament.IPC;
 using osu.Game.Tournament.Models;
@@ -24,7 +23,6 @@ namespace osu.Game.Tournament.Screens.Setup
     {
         private FillFlowContainer fillFlow = null!;
 
-        private LoginOverlay? loginOverlay;
         private ResolutionSelector resolution = null!;
 
         [Resolved]
@@ -95,25 +93,10 @@ namespace osu.Game.Tournament.Screens.Setup
                 new ActionableInfo
                 {
                     Label = "Current user",
-                    ButtonText = "Change sign-in",
-                    Action = () =>
-                    {
-                        api.Logout();
-
-                        if (loginOverlay == null)
-                        {
-                            AddInternal(loginOverlay = new LoginOverlay
-                            {
-                                Anchor = Anchor.TopRight,
-                                Origin = Anchor.TopRight,
-                            });
-                        }
-
-                        loginOverlay.State.Value = Visibility.Visible;
-                    },
+                    ButtonText = "Sign-in unavailable",
+                    // Guest mode: there is no account system, so signing in is not possible.
                     Value = api.LocalUser.Value.Username,
-                    Failing = api.IsLoggedIn != true,
-                    Description = "In order to access the API and display metadata, signing in is required."
+                    Description = "This build runs in guest mode; signing in is not supported."
                 },
                 new LabelledDropdown<RulesetInfo?>(padded: true)
                 {

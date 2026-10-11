@@ -1,4 +1,4 @@
-// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
@@ -180,15 +180,11 @@ namespace osu.Game.Tests.Visual.Gameplay
                 }
             });
 
-            AddStep("log out", () => API.Logout());
+            AddStep("log out", () => ((DummyAPIAccess)API).LogoutDummyUser());
             CreateTest();
 
             AddUntilStep("wait for track to start running", () => Beatmap.Value.Track.IsRunning);
-            AddStep("log back in", () =>
-            {
-                API.Login("username", "password");
-                ((DummyAPIAccess)API).AuthenticateSecondFactor("abcdefgh");
-            });
+            AddStep("log back in", () => ((DummyAPIAccess)API).LoginAsDummyUser("username"));
 
             AddStep("seek to completion", () => Player.GameplayClockContainer.Seek(Player.DrawableRuleset.Objects.Last().GetEndTime()));
 

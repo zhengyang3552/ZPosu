@@ -20,7 +20,6 @@ using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Online.Multiplayer;
 using osu.Game.Online.Rooms;
-using osu.Game.Overlays;
 using osu.Game.Rulesets;
 using osu.Game.Users;
 using LogLevel = osu.Framework.Logging.LogLevel;
@@ -41,9 +40,6 @@ namespace osu.Desktop
 
         [Resolved]
         private OsuGame game { get; set; } = null!;
-
-        [Resolved]
-        private LoginOverlay? login { get; set; }
 
         [Resolved]
         private MultiplayerClient multiplayerClient { get; set; } = null!;
@@ -244,7 +240,7 @@ namespace osu.Desktop
 
             if (!api.IsLoggedIn)
             {
-                login?.Show();
+                // Guest mode: there is no account system, so multiplayer join requests are unavailable.
                 return;
             }
 

@@ -1,4 +1,4 @@
-// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
@@ -32,7 +32,7 @@ namespace osu.Game.Tests.Visual.SongSelect
         private BeatmapCarouselFilterGrouping grouping => Carousel.Filters.OfType<BeatmapCarouselFilterGrouping>().Single();
 
         [SetUp]
-        public void SetUp() => Schedule(() => API.Logout());
+        public void SetUp() => Schedule(() => ((DummyAPIAccess)API).LogoutDummyUser());
 
         #region Collection grouping
 
@@ -128,11 +128,7 @@ namespace osu.Game.Tests.Visual.SongSelect
 
             AddStep("get beatmaps", () => beatmapSets = Beatmaps.GetAllUsableBeatmapSets().OrderBy(b => b.OnlineID).ToArray());
 
-            AddStep("log in", () =>
-            {
-                API.Login("user1", string.Empty);
-                API.AuthenticateSecondFactor("abcdefgh");
-            });
+            AddStep("log in", () => ((DummyAPIAccess)API).LoginAsDummyUser("user1"));
 
             LoadSongSelect();
             GroupBy(GroupMode.MyMaps);
@@ -157,11 +153,7 @@ namespace osu.Game.Tests.Visual.SongSelect
 
             AddStep("get beatmaps", () => beatmapSets = Beatmaps.GetAllUsableBeatmapSets().OrderBy(b => b.OnlineID).ToArray());
 
-            AddStep("log in", () =>
-            {
-                API.Login("user1", string.Empty);
-                API.AuthenticateSecondFactor("abcdefgh");
-            });
+            AddStep("log in", () => ((DummyAPIAccess)API).LoginAsDummyUser("user1"));
 
             LoadSongSelect();
             GroupBy(GroupMode.MyMaps);
@@ -193,8 +185,7 @@ namespace osu.Game.Tests.Visual.SongSelect
 
             AddStep("log in", () =>
             {
-                API.Login("user2", string.Empty);
-                API.AuthenticateSecondFactor("abcdefgh");
+                ((DummyAPIAccess)API).LoginAsDummyUser("user2");
             });
 
             WaitForFiltering();
@@ -216,11 +207,7 @@ namespace osu.Game.Tests.Visual.SongSelect
             ImportBeatmapForRuleset(_ => { }, 1, 0);
             ImportBeatmapForRuleset(_ => { }, 1, 0);
 
-            AddStep("log in", () =>
-            {
-                API.Login("user1", string.Empty); // match username in test scores.
-                API.AuthenticateSecondFactor("abcdefgh");
-            });
+            AddStep("log in", () => ((DummyAPIAccess)API).LoginAsDummyUser("user1")); // match username in test scores.
 
             BeatmapSetInfo[] beatmapSets = null!;
 
@@ -264,11 +251,7 @@ namespace osu.Game.Tests.Visual.SongSelect
             const int sets_count = 100;
             const int diffs_count = 100;
 
-            AddStep("log in", () =>
-            {
-                API.Login("user1", string.Empty); // match username in test scores.
-                API.AuthenticateSecondFactor("abcdefgh");
-            });
+            AddStep("log in", () => ((DummyAPIAccess)API).LoginAsDummyUser("user1")); // match username in test scores.
 
             int count = 0;
 
