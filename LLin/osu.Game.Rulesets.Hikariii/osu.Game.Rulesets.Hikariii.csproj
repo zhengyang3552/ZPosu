@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="Project">
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyTitle>osu.Game.Rulesets.IGPlayer</AssemblyTitle>
+    <OutputType>Library</OutputType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Nullable>enable</Nullable>
+    <AssemblyVersion>0.0.0.0</AssemblyVersion>
+    <FileVersion>0.0.0.0</FileVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Textures\**\*" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Compiled against this repository's osu.Game sources (upstream referenced ppy.osu.Game 2026.730.0). -->
+    <ProjectReference Include="..\..\osu.Game\osu.Game.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\LLin.OSIntegrations\LLin.OSIntegrations.csproj" />
+    <ProjectReference Include="..\M.Resources\M.Resources.csproj" />
+  </ItemGroup>
+</Project>

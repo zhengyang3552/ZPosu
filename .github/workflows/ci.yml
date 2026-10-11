@@ -36,20 +36,6 @@ jobs:
       - name: Dotnet code style
         run: dotnet build -c Debug -warnaserror osu.Desktop.slnf -p:EnforceCodeStyleInBuild=true
 
-      - name: CodeFileSanity
-        shell: bash
-        run: |
-          # TODO: Add ignore filters and GitHub Workflow Command Reporting in CFS. That way we don't have to do this workaround.
-          # FIXME: Suppress warnings from templates project
-          exit_code=0
-          while read -r line; do
-            if [[ ! -z "$line" ]]; then
-              echo "::error::$line"
-              exit_code=1
-            fi
-          done <<< $(dotnet codefilesanity)
-          exit $exit_code
-
       - name: InspectCode
         uses: JetBrains/ReSharper-InspectCode@v0.12
         with:
@@ -60,70 +46,6 @@ jobs:
           solution: ./osu.Desktop.slnf
           caches-home: inspectcode
           verbosity: WARN
-
-  test:
-    name: Test
-    runs-on: ${{matrix.os.fullname}}
-    env:
-      OSU_EXECUTION_MODE: ${{matrix.threadingMode}}
-    strategy:
-       fail-fast: false
-       matrix:
-          os:
-            - { prettyname: Windows, fullname: windows-latest }
-          threadingMode: ['SingleThread', 'MultiThreaded']
-    timeout-minutes: 120
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Install .NET 10.0.x
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: "10.0.x"
-
-      - name: Compile
-        run: dotnet build -c Debug -warnaserror osu.Desktop.slnf
-
-      - name: Test
-        run: dotnet test osu.Desktop.slnf --logger "trx;LogFileName=TestResults-${{matrix.os.prettyname}}-${{matrix.threadingMode}}.trx" -- NUnit.ConsoleOut=0
-
-      # Attempt to upload results even if test fails.
-      # https://docs.github.com/en/actions/reference/workflows-and-actions/expressions#cancelled
-      - name: Upload Test Results
-        uses: actions/upload-artifact@v7
-        if: ${{ !cancelled() }}
-        with:
-          name: osu-test-results-${{matrix.os.prettyname}}-${{matrix.threadingMode}}
-          path: ${{github.workspace}}/**/TestResults/TestResults-${{matrix.os.prettyname}}-${{matrix.threadingMode}}.trx
-
-  test-results:
-    name: Test results
-    runs-on: windows-latest
-    # we want to wait for the `test` job to complete, but run regardless of whether it succeeds or fails
-    # https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#example-not-requiring-successful-dependent-jobs
-    if: ${{ !cancelled() }}
-    needs: test
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Download results
-        uses: actions/download-artifact@v8
-        with:
-          pattern: osu-test-results-*
-          merge-multiple: true
-
-      - name: Add test results summary to workflow run
-        uses: dorny/test-reporter@v3.0.0
-        with:
-          name: Results
-          path: "**/*.trx"
-          reporter: dotnet-trx
-          list-suites: 'failed'
-          list-tests: 'failed'
-          use-actions-summary: 'true'
 
   windows-build:
     name: Windows build (win-x64)

@@ -1,0 +1,249 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using osu.Framework.Allocation;
+using osu.Framework.Audio;
+using osu.Framework.Audio.Sample;
+using osu.Framework.Bindables;
+using osu.Framework.Extensions.Color4Extensions;
+using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Shapes;
+using osu.Game.Overlays;
+using osu.Game.Rulesets.Hikariii.Features.Player.Graphics.SideBar.Tabs;
+using osu.Game.Rulesets.Hikariii.Features.Player.Interfaces;
+using osu.Game.Rulesets.Hikariii.Features.Player.Screens.LLin;
+using osuTK.Graphics;
+
+namespace osu.Game.Rulesets.Hikariii.Features.Player.Graphics.SideBar
+{
+    internal partial class PluginOptionsContainer : VisibilityContainer
+    {
+        [Resolved]
+        private CustomColourProvider colourProvider { get; set; } = null!;
+
+        [Resolved(CanBeNull = true)]
+        private IImplementLLin? llin { get; set; }
+
+        public readonly List<ISidebarContent> Components = new List<ISidebarContent>();
+
+        public OptionButtonFlow Header = null!;
+
+        private const float duration = 400;
+        private TabControlItem? prevTab;
+
+        public Bindable<Drawable> CurrentDisplay = new Bindable<Drawable>();
+
+        private readonly Container<Drawable> contentContainer;
+        protected override Container<Drawable> Content => contentContainer;
+
+        private Sample? sampleToggle;
+        private Sample? samplePopIn;
+        private Sample? samplePopOut;
+
+        private bool startFromHiddenState;
+        private bool isFirstHide = true;
+        private readonly Box bgBox;
+        private readonly LLinBottombarPaddingIndicatorMaybe dropdown;
+
+        [Cached]
+        private OverlayColourProvider overlayColourProvider = new(OverlayColourScheme.Blue);
+
+        public PluginOptionsContainer()
+        {
+            RelativeSizeAxes = Axes.Both;
+
+            InternalChildren =
+            [
+                bgBox = new Box
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Colour = Color4.Black.Opacity(0.6f)
+                },
+                contentContainer = new Container
+                {
+                    Name = "Content",
+                    RelativeSizeAxes = Axes.Both,
+                    Anchor = Anchor.BottomRight,
+                    Origin = Anchor.BottomRight,
+                },
+                dropdown = new LLinBottombarPaddingIndicatorMaybe
+                {
+                    RelativeSizeAxes = Axes.X,
+                    Anchor = Anchor.BottomLeft,
+                    Origin = Anchor.BottomLeft,
+                }
+            ];
+        }
+
+        [BackgroundDependencyLoader]
+        private void load(AudioManager audio)
+        {
+            sampleToggle = audio.Samples.Get("UI/overlay-pop-in");
+            samplePopIn = audio.Samples.Get("UI/overlay-pop-in");
+            samplePopOut = audio.Samples.Get("UI/overlay-pop-out");
+
+            colourProvider.HueColour.BindValueChanged(v =>
+            {
+                bgBox.Colour = colourProvider.Background5.Opacity(0.8f);
+            }, true);
+
+            CurrentDisplay.BindValueChanged(onCurrentDisplayChanged);
+        }
+
+        protected override void LoadComplete()
+        {
+            llin?.BottomSafeAreaPadding.BindValueChanged(this.onBottomSafeAreaChange, true);
+
+            base.LoadComplete();
+        }
+
+        private void onCurrentDisplayChanged(ValueChangedEvent<Drawable> v)
+        {
+            if (v.NewValue is not ISidebarContent sc) return;
+
+            prevTab?.MakeInActive();
+
+            foreach (TabControlItem t in Header.Tabs.Where(t => t.Value == sc))
+            {
+                t.MakeActive();
+                prevTab = t;
+                break;
+            }
+
+            if (!startFromHiddenState)
+                sampleToggle?.Play();
+        }
+
+        private void onBottomSafeAreaChange(ValueChangedEvent<float> v)
+        {
+            var contentNewPadding = new MarginPadding
+            {
+                Right = Header.GetRightUnavaliableSpace(),
+                Left = Header.GetLeftUnavaliableSpace(),
+                Top = Header.GetTopUnavaliableSpace(),
+                Bottom = v.NewValue
+            };
+
+            contentContainer.TransformTo(nameof(contentContainer.Padding), contentNewPadding, duration, Easing.OutQuint);
+
+            dropdown.ResizeHeightTo(v.NewValue, duration, Easing.OutQuint);
+        }
+
+        public void ShowComponent(Drawable? d, bool allowHide = false)
+        {
+            if (d == null)
+            {
+                Hide();
+                return;
+            }
+
+            if (!(d is ISidebarContent c))
+                throw new InvalidOperationException($"{d}不是{typeof(ISidebarContent)}");
+
+            if (!Components.Contains(c))
+                throw new InvalidOperationException($"组成部分中不包含{c}");
+
+            startFromHiddenState = State.Value == Visibility.Hidden;
+
+            if (CurrentDisplay.Value == d)
+            {
+                //如果要显示的是当前正在显示的内容，则中断
+                if (State.Value == Visibility.Visible)
+                {
+                    if (allowHide) Hide();
+
+                    return;
+                }
+                else
+                    prevTab?.MakeActive();
+            }
+
+            Show();
+
+            var resizeDuration = startFromHiddenState ? 0 : duration;
+
+            var lastDisplay = CurrentDisplay.Value;
+            lastDisplay?.FadeOut(resizeDuration / 2, Easing.OutQuint)
+                       .OnComplete(_ => contentContainer.Remove(lastDisplay, false));
+
+            if (!contentContainer.Contains(d))
+                contentContainer.Add(d);
+
+            //如果某一个侧边栏元素在较短的时间内切换，那么FadeTo(0.01f)可以打断上面的OnComplete
+            d.FadeTo(0.01f).FadeTo(0).Then()
+             .Delay(resizeDuration / 2).FadeIn(resizeDuration / 2);
+
+            CurrentDisplay.Value = d;
+        }
+
+        private void addDrawableToList(Drawable d)
+        {
+            if (d is ISidebarContent s)
+            {
+                d.Alpha = 0;
+                Components.Add(s);
+                Header.Tabs.Add(new TabControlItem(s)
+                {
+                    Action = () => ShowComponent(d, true)
+                });
+            }
+        }
+
+        public override void Add(Drawable drawable) => addDrawableToList(drawable);
+
+        public override void Clear(bool disposeChildren)
+        {
+            Header.Tabs.Clear(disposeChildren);
+            contentContainer.Clear(disposeChildren);
+        }
+
+        public override bool Remove(Drawable drawable, bool disposeImmediately)
+        {
+            if (drawable is not ISidebarContent sc)
+                return base.Remove(drawable, disposeImmediately);
+
+            foreach (TabControlItem t in Header.Tabs.Where(t => t.Value == sc))
+            {
+                Header.Tabs.Remove(t, true);
+                drawable.Expire();
+                return true;
+            }
+
+            return base.Remove(drawable, disposeImmediately);
+        }
+
+        protected override void PopOut()
+        {
+            if (!isFirstHide)
+                samplePopOut?.Play();
+            else
+                isFirstHide = false;
+
+            Header.SidebarActive = false;
+            Header.Hide();
+            bgBox.FadeOut(duration, Easing.OutQuint);
+
+            contentContainer.FadeOut(duration, Easing.OutQuint)
+                            .MoveToX(35, duration, Easing.OutQuint);
+
+            dropdown.FadeOut(duration, Easing.OutQuint);
+
+            prevTab?.MakeInActive();
+        }
+
+        protected override void PopIn()
+        {
+            samplePopIn?.Play();
+
+            dropdown.FadeIn(duration, Easing.OutQuint);
+
+            Header.SidebarActive = true;
+            Header.Show();
+            bgBox.FadeIn(duration, Easing.OutQuint);
+
+            contentContainer.FadeIn(duration, Easing.OutQuint)
+                            .MoveToX(0, duration, Easing.OutQuint);
+        }
+    }
+}

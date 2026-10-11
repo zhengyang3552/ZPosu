@@ -1,0 +1,193 @@
+using System.Collections.Generic;
+using System.Threading;
+using osu.Framework.Allocation;
+using osu.Framework.Bindables;
+using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
+using osu.Game.Beatmaps;
+using osu.Game.Collections;
+using osu.Game.Graphics;
+using osu.Game.Graphics.Sprites;
+using osu.Game.Graphics.UserInterface;
+using osu.Game.Rulesets.Hikariii.Features.Player.Misc;
+using osu.Game.Rulesets.Hikariii.Localisation.LLin.Plugins;
+using osuTK;
+
+namespace osu.Game.Rulesets.Hikariii.Features.Player.Plugins.Bundle.Collection.Sidebar
+{
+    public partial class DrawableCollectionInfo : CompositeDrawable
+    {
+        private OsuSpriteText collectionName = null!;
+        private OsuSpriteText collectionBeatmapCount = null!;
+        private readonly Bindable<BeatmapCollection> collection = new();
+        private readonly Dictionary<IBeatmapSetInfo, List<BeatmapInfo>> beatmapSets = new();
+
+        private BeatmapList? beatmapList;
+        private readonly BindableBool isCurrentCollection = new BindableBool();
+
+        public DrawableCollectionInfo()
+        {
+            RelativeSizeAxes = Axes.Both;
+            Masking = true;
+        }
+
+        [BackgroundDependencyLoader]
+        private void load()
+        {
+            InternalChildren = new Drawable[]
+            {
+                new GridContainer
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    RowDimensions = new[]
+                    {
+                        new Dimension(GridSizeMode.AutoSize),
+                        new Dimension(),
+                    },
+                    Content = new[]
+                    {
+                        new Drawable[]
+                        {
+                            new Container
+                            {
+                                Name = "标题容器",
+                                RelativeSizeAxes = Axes.X,
+                                AutoSizeAxes = Axes.Y,
+                                AutoSizeDuration = 300,
+                                AutoSizeEasing = Easing.OutQuint,
+                                Masking = true,
+                                Children = new Drawable[]
+                                {
+                                    new FillFlowContainer
+                                    {
+                                        RelativeSizeAxes = Axes.X,
+                                        AutoSizeAxes = Axes.Y,
+                                        Direction = FillDirection.Vertical,
+                                        Spacing = new Vector2(12),
+                                        Padding = new MarginPadding { Horizontal = 35, Vertical = 25 },
+                                        Anchor = Anchor.CentreLeft,
+                                        Origin = Anchor.CentreLeft,
+                                        Children = new Drawable[]
+                                        {
+                                            collectionName = new OsuSpriteText
+                                            {
+                                                Font = OsuFont.GetFont(size: 50),
+                                                //RelativeSizeAxes = Axes.X,
+                                                Text = CollectionStrings.NoCollectionSelected,
+                                                //Truncate = true
+                                            },
+                                            collectionBeatmapCount = new OsuSpriteText
+                                            {
+                                                Font = OsuFont.GetFont(size: 38),
+                                                //RelativeSizeAxes = Axes.X,
+                                                Text = CollectionStrings.SelectOneFirst,
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        new Drawable[]
+                        {
+                            new Container
+                            {
+                                RelativeSizeAxes = Axes.Both,
+                                Children = new Drawable[]
+                                {
+                                    listContainer = new Container
+                                    {
+                                        RelativeSizeAxes = Axes.Both
+                                    },
+                                    loadingSpinner = new LoadingSpinner(true)
+                                    {
+                                        Size = new Vector2(50)
+                                    }
+                                }
+                            },
+                        }
+                    }
+                },
+            };
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            collection.BindValueChanged(OnCollectionChanged);
+        }
+
+        [Resolved]
+        private BeatmapHashResolver hashResolver { get; set; } = null!;
+
+        [Resolved]
+        private CollectionHelper collectionHelper { get; set; } = null!;
+
+        private void OnCollectionChanged(ValueChangedEvent<BeatmapCollection> v)
+        {
+            var c = v.NewValue;
+
+            if (c.Equals(CollectionHelper.DEFAULT_COLLECTION))
+            {
+                clearInfo();
+                return;
+            }
+
+            beatmapSets.Clear();
+
+            foreach (var keyValuePair in collectionHelper.ExtractBeatmaps(c))
+                beatmapSets[keyValuePair.Key] = keyValuePair.Value;
+
+            collectionName.Text = c.Name;
+            collectionBeatmapCount.Text = CollectionStrings.SongCount(beatmapSets.Count);
+
+            refreshBeatmapSetList();
+        }
+
+        private CancellationTokenSource? refreshTaskCancellationToken;
+        private Container listContainer = null!;
+        private LoadingSpinner loadingSpinner = null!;
+
+        private void refreshBeatmapSetList()
+        {
+            refreshTaskCancellationToken?.Cancel();
+            refreshTaskCancellationToken = new CancellationTokenSource();
+
+            beatmapList?.FadeOut(250).Then().Expire();
+            loadingSpinner.Show();
+
+            LoadComponentAsync(new BeatmapList(beatmapSets), newList =>
+            {
+                newList.IsCurrent.BindTo(isCurrentCollection);
+                beatmapList = newList;
+
+                listContainer.Add(newList);
+                newList.Show();
+                loadingSpinner.Hide();
+            }, refreshTaskCancellationToken.Token);
+        }
+
+        public void UpdateCollection(BeatmapCollection collection, bool isCurrent)
+        {
+            if (collection != this.collection.Value && beatmapList != null)
+            {
+                beatmapList.IsCurrent.UnbindAll();
+                beatmapList.IsCurrent.Value = false;
+            }
+
+            //设置当前选择是否为正在播放的收藏夹
+            isCurrentCollection.Value = isCurrent;
+
+            //将当前收藏夹设为collection
+            this.collection.Value = collection;
+        }
+
+        private void clearInfo()
+        {
+            beatmapSets.Clear();
+            beatmapList?.ClearList();
+            collectionName.Text = CollectionStrings.NoCollectionSelected;
+            collectionBeatmapCount.Text = CollectionStrings.SelectOneFirst;
+        }
+    }
+}

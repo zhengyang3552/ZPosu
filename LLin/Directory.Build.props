@@ -1,0 +1,19 @@
+<!--
+  Third-party code (LLin / Hikariii, MIT) is vendored under this directory so that it is
+  compiled against this repository's osu.Game/osu.Framework sources instead of the NuGet
+  versions it was originally built against.
+
+  This file deliberately does NOT import the repository-root Directory.Build.props: upstream
+  analyzer strictness (banned APIs, code style enforced as errors) is not appropriate for
+  code we do not own.
+-->
+<Project>
+  <PropertyGroup Label="C#">
+    <LangVersion>14.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <GenerateAssemblyInfo Condition="'$(Configuration)'=='Debug'">false</GenerateAssemblyInfo>
+    <NoWarn>$(NoWarn);CA1416;CS1591;NU1701</NoWarn>
+    <RunAnalyzers>false</RunAnalyzers>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+</Project>

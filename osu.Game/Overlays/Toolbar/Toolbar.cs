@@ -34,7 +34,6 @@ namespace osu.Game.Overlays.Toolbar
 
         public Action OnHome;
 
-        private ToolbarUserButton userButton;
         private ToolbarRulesetSelector rulesetSelector;
 
         private const double transition_time = 500;
@@ -165,11 +164,6 @@ namespace osu.Game.Overlays.Toolbar
                                             new ToolbarChangelogButton(),
                                             new ToolbarBeatmapListingButton(),
                                             new ToolbarMusicButton(),
-                                            //new ToolbarButton
-                                            //{
-                                            //    Icon = FontAwesome.Solid.search
-                                            //},
-                                            userButton = new ToolbarUserButton(),
                                             new ToolbarClock(),
                                             new ToolbarNotificationButton(),
                                         }
@@ -287,8 +281,6 @@ namespace osu.Game.Overlays.Toolbar
 
         protected override void PopOut()
         {
-            userButton.StateContainer?.Hide();
-
             this.MoveToY(-DrawSize.Y, transition_time, Easing.OutQuint);
             this.FadeOut(transition_time, Easing.InQuint);
         }

@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Authors>LLin Devs</Authors>
+        <Copyright>LLin Devs</Copyright>
+        <PackageProjectUrl>https://github.com/matrix-feather/osu</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/matrix-feather/osu</RepositoryUrl>
+        <PackageTags />
+        <Company>NiFeather</Company>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Tmds.DBus.Protocol" Version="0.92.0" />
+    <PackageReference Include="Tmds.DBus.SourceGenerator" Version="0.0.22" PrivateAssets="all">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="DBusXml/Handler/*.xml" DBusGeneratorMode="Handler" />
+    <AdditionalFiles Include="DBusXml/Proxy/*.xml" DBusGeneratorMode="Proxy" />
+</ItemGroup>
+</Project>

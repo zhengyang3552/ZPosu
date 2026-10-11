@@ -1,0 +1,59 @@
+using System;
+using LLin.OSIntegrations.Linux.DBus;
+using LLin.OSIntegrations.Linux.DBus.Services.Greeter;
+using osu.Framework.Allocation;
+using osu.Framework.Graphics.Containers;
+using Tmds.DBus.Protocol;
+
+namespace osu.Game.Rulesets.Hikariii.Features.SystemIntegration.DBus;
+
+public partial class DBusIntegration : CompositeComponent
+{
+    public DBusIntegration()
+    {
+    }
+
+    public DBusSession AcquireNewSession()
+    {
+        return new DBusSession(Address.Session!);
+    }
+
+    [BackgroundDependencyLoader]
+    private void load()
+    {
+        int start = DateTime.Now.Millisecond;
+
+        var session = AcquireNewSession();
+        session.OnConnected += registerGreeter;
+        session.Connect().Wait();
+
+        int end = DateTime.Now.Millisecond;
+
+        Logging.Log($"Done connecting to DBus! Took {end - start}ms.");
+    }
+
+    private void registerGreeter(DBusSession session)
+    {
+        if (session == null)
+            throw new ArgumentNullException(nameof(session));
+
+        var connection = session.CurrentConnection!;
+
+        var greeter = new GreeterService("llin");
+        greeter.Register(connection);
+
+        session.RequestServiceName("xyz.nifeather.mfosu").Wait();
+        Logging.Log("Registered DBus greeter service.");
+    }
+
+    //public Action<DBusMgrNew>? OnDBusConnected;
+
+    private void onConnected()
+    {
+        //GreetService.register(DBusManager.CurrentConnection);
+        //DBusManager.RegisterObject(GreetService).Wait();
+        //GreetService.SwitchState(true, "DBus connected");
+
+        //OnDBusConnected?.Invoke(DBusManager);
+    }
+}

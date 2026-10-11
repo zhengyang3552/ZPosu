@@ -28,7 +28,6 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Input.Bindings;
 using osu.Game.IO;
 using osu.Game.Localisation;
-using osu.Game.Online.API;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Dialog;
 using osu.Game.Overlays.SkinEditor;
@@ -71,13 +70,7 @@ namespace osu.Game.Screens.Menu
         private MusicController musicController { get; set; }
 
         [Resolved]
-        private IAPIProvider api { get; set; }
-
-        [Resolved]
         private Storage storage { get; set; }
-
-        [Resolved(canBeNull: true)]
-        private LoginOverlay login { get; set; }
 
         [Resolved(canBeNull: true)]
         private IDialogOverlay dialogOverlay { get; set; }
@@ -91,7 +84,6 @@ namespace osu.Game.Screens.Menu
         protected override bool PlayExitSound => false;
 
         private Bindable<double> holdDelay;
-        private Bindable<bool> loginDisplayed;
         private Bindable<bool> showMobileDisclaimer;
 
         private HoldToExitGameOverlay holdToExitGameOverlay;
@@ -115,10 +107,9 @@ namespace osu.Game.Screens.Menu
         private IDisposable logoProxy;
 
         [BackgroundDependencyLoader(true)]
-        private void load(BeatmapListingOverlay beatmapListing, SettingsOverlay settings, OsuConfigManager config, SessionStatics statics, AudioManager audio)
+        private void load(BeatmapListingOverlay beatmapListing, SettingsOverlay settings, OsuConfigManager config, AudioManager audio)
         {
             holdDelay = config.GetBindable<double>(OsuSetting.UIHoldActivationDelay);
-            loginDisplayed = statics.GetBindable<bool>(Static.LoginOverlayDisplayed);
             showMobileDisclaimer = config.GetBindable<bool>(OsuSetting.ShowMobileDisclaimer);
 
             if (host.CanExit)
@@ -294,25 +285,10 @@ namespace osu.Game.Screens.Menu
                     dialogOverlay.Push(new MobileDisclaimerDialog(() =>
                     {
                         showMobileDisclaimer.Value = false;
-                        displayLoginIfApplicable();
                     }));
                 }, 500);
             }
-            else
-                displayLoginIfApplicable();
-
             return originalAction.Invoke();
-        }
-
-        private void displayLoginIfApplicable()
-        {
-            if (loginDisplayed.Value) return;
-
-            if (!api.IsLoggedIn || api.State.Value == APIState.RequiresSecondFactorAuth)
-            {
-                Scheduler.AddDelayed(() => login?.Show(), 500);
-                loginDisplayed.Value = true;
-            }
         }
 
         protected override void LogoSuspending(OsuLogo logo)

@@ -43,8 +43,8 @@
     <Content Include="*.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"/>
   </ItemGroup>
   <ItemGroup Label="Bundled ruleset plugin (LLin / Hikariii)">
-    <!-- RulesetStore scans the startup directory for osu.Game.Rulesets.*.dll, so these have to land in the output root. -->
-    <Content Include="..\LLin\*.dll" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"/>
-    <Content Include="..\LLin\zh\*.dll" Link="zh\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"/>
+    <!-- Referenced as a project so it is compiled against this repository's osu.Game sources.
+         Its output lands next to the executable, where RulesetStore looks for osu.Game.Rulesets.*.dll. -->
+    <ProjectReference Include="..\LLin\osu.Game.Rulesets.Hikariii\osu.Game.Rulesets.Hikariii.csproj" />
   </ItemGroup>
 </Project>
