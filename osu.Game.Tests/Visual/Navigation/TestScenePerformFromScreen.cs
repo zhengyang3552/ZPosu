@@ -130,7 +130,7 @@ namespace osu.Game.Tests.Visual.Navigation
             AddUntilStep("is at menu", () => Game.ScreenStack.CurrentScreen is MainMenu);
             AddUntilStep("wait for chat load", () => (chat = Game.ChildrenOfType<ChatOverlay>().SingleOrDefault()) != null);
 
-            AddStep("show chat", () => InputManager.Key(Key.F8));
+            AddStep("show chat", () => chat.Show());
 
             AddStep("try to perform", () => Game.PerformFromScreen(_ => actionPerformed = true));
 

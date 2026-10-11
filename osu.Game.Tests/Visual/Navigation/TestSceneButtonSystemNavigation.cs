@@ -52,9 +52,6 @@ namespace osu.Game.Tests.Visual.Navigation
             AddAssert("state is top level", () => buttons.State == ButtonSystemState.TopLevel);
 
             AddStep("press P", () => InputManager.Key(Key.P));
-            AddAssert("state is play", () => buttons.State == ButtonSystemState.Play);
-
-            AddStep("press P", () => InputManager.Key(Key.P));
             AddAssert("entered song select", () => Game.ScreenStack.CurrentScreen is SoloSongSelect);
         }
     }

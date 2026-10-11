@@ -67,10 +67,7 @@ namespace osu.Game.Tests.Visual.UserInterface
             AddStep("Enter mode", performEnterMode);
         }
 
-        [TestCase(Key.P, Key.P)]
-        [TestCase(Key.M, Key.M, Key.L)]
-        [TestCase(Key.M, Key.M, Key.M)]
-        [TestCase(Key.L, Key.L)]
+        [TestCase(Key.P)]
         [TestCase(Key.B, Key.E, Key.B)]
         [TestCase(Key.S, Key.E, Key.S)]
         [TestCase(Key.D)]
@@ -88,14 +85,6 @@ namespace osu.Game.Tests.Visual.UserInterface
                 {
                     case Key.P:
                         buttons.OnSolo = action;
-                        break;
-
-                    case Key.M:
-                        buttons.OnMultiplayer = action;
-                        break;
-
-                    case Key.L:
-                        buttons.OnPlaylists = action;
                         break;
 
                     case Key.B:
