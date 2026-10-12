@@ -2,7 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using osu.Framework.Audio.Track;
+using osu.Framework.Audio;
 
 namespace osu.Game.Media
 {

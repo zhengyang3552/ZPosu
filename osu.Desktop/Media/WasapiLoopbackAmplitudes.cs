@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using NAudio.CoreAudioApi;
 using NAudio.Dsp;
 using NAudio.Wave;
+using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
 
 namespace osu.Desktop.Media
