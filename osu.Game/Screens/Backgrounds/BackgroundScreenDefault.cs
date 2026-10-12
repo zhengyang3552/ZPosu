@@ -63,12 +63,12 @@ namespace osu.Game.Screens.Backgrounds
         {
             base.LoadComplete();
 
-            user.ValueChanged += _ => Scheduler.AddOnce(next);
-            skin.ValueChanged += _ => Scheduler.AddOnce(next);
-            source.ValueChanged += _ => Scheduler.AddOnce(next);
-            beatmap.ValueChanged += _ => Scheduler.AddOnce(next);
-            introSequence.ValueChanged += _ => Scheduler.AddOnce(next);
-            seasonalBackgroundLoader.SeasonalBackgroundChanged += () => Scheduler.AddOnce(next);
+            user.ValueChanged += _ => Scheduler.AddOnce(refreshCaptureBackground);
+            skin.ValueChanged += _ => Scheduler.AddOnce(refreshCaptureBackground);
+            source.ValueChanged += _ => Scheduler.AddOnce(refreshCaptureBackground);
+            beatmap.ValueChanged += _ => Scheduler.AddOnce(refreshCaptureBackground);
+            introSequence.ValueChanged += _ => Scheduler.AddOnce(refreshCaptureBackground);
+            seasonalBackgroundLoader.SeasonalBackgroundChanged += () => Scheduler.AddOnce(refreshCaptureBackground);
 
             captureEnabled.BindValueChanged(_ => Scheduler.AddOnce(refreshCaptureBackground));
 
@@ -79,17 +79,19 @@ namespace osu.Game.Screens.Backgrounds
             }
 
             currentDisplay = RNG.Next(0, background_count);
-            Next();
 
-            // helper function required for AddOnce usage.
-            void next() => Next();
+            // the initial load always uses the normal background rotation (the capture source is not ready yet).
+            loadBackground(createBackground());
 
+            // Reacts to events which should not rotate the system player's track.
+            // While capturing system media with a cover available, the same cover is re-applied (a no-op);
+            // otherwise the normal background rotation is loaded.
             void refreshCaptureBackground()
             {
                 if (systemMediaCapture?.Active == true && systemMediaCapture.CoverTexture.Value != null)
                     loadBackground(new SystemMediaBackground(systemMediaCapture.CoverTexture.Value));
                 else
-                    Next();
+                    loadBackground(createBackground());
             }
         }
 

@@ -22,6 +22,7 @@ using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.Extensions;
 using osu.Game.Localisation;
+using osu.Game.Media;
 using osu.Game.Online.API;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
@@ -79,6 +80,9 @@ namespace osu.Game.Screens.Menu
 
         [Resolved]
         private MusicController musicController { get; set; }
+
+        [Resolved(canBeNull: true)]
+        private SystemMediaCapture? systemMediaCapture { get; set; }
 
         [CanBeNull]
         private readonly Func<OsuScreen> createNextScreen;
@@ -302,6 +306,10 @@ namespace osu.Game.Screens.Menu
 
         protected void StartTrack()
         {
+            // while capturing system media, don't play the intro track (the system player takes over).
+            if (systemMediaCapture?.Active == true)
+                return;
+
             var drawableTrack = musicController.CurrentTrack;
 
             if (!UsingThemedIntro)

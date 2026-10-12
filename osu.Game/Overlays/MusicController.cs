@@ -196,6 +196,12 @@ namespace osu.Game.Overlays
         /// <returns>Whether the operation was successful.</returns>
         public bool Play(bool restart = false, bool requestedByUser = false)
         {
+            // while capturing system media, in-game music playback is suppressed entirely;
+            // the system player is the sole source of music (this also covers song select's
+            // automatic preview playback, which is issued as a `Play` call).
+            if (captureActive)
+                return false;
+
             if (requestedByUser && !AllowTrackControl.Value)
                 return false;
 

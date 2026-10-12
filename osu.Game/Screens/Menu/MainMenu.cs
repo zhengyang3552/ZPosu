@@ -28,6 +28,7 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Input.Bindings;
 using osu.Game.IO;
 using osu.Game.Localisation;
+using osu.Game.Media;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Dialog;
 using osu.Game.Overlays.SkinEditor;
@@ -68,6 +69,9 @@ namespace osu.Game.Screens.Menu
 
         [Resolved]
         private MusicController musicController { get; set; }
+
+        [Resolved(canBeNull: true)]
+        private SystemMediaCapture? systemMediaCapture { get; set; }
 
         [Resolved]
         private Storage storage { get; set; }
@@ -224,7 +228,8 @@ namespace osu.Game.Screens.Menu
             base.OnEntering(e);
             Buttons.FadeInFromZero(500);
 
-            if (e.Last is IntroScreen && musicController.TrackLoaded)
+            // while capturing system media, the intro track is left alone (the system player takes over).
+            if (e.Last is IntroScreen && musicController.TrackLoaded && systemMediaCapture?.Active != true)
             {
                 var track = musicController.CurrentTrack;
 

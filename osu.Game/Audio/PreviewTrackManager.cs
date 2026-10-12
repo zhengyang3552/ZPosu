@@ -8,6 +8,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
+using osu.Game.Media;
 using osu.Game.Online;
 
 namespace osu.Game.Audio
@@ -94,6 +95,9 @@ namespace osu.Game.Audio
             [Resolved]
             public IPreviewTrackOwner? Owner { get; private set; }
 
+            [Resolved(canBeNull: true)]
+            private SystemMediaCapture? systemMediaCapture { get; set; }
+
             private readonly IBeatmapSetInfo beatmapSetInfo;
             private readonly ITrackStore trackManager;
 
@@ -111,7 +115,14 @@ namespace osu.Game.Audio
                     Logger.Log($"A {nameof(PreviewTrack)} was created without a containing {nameof(IPreviewTrackOwner)}. An owner should be added for correct behaviour.");
             }
 
-            protected override Track GetTrack() => trackManager.Get($"https://b.ppy.sh/preview/{beatmapSetInfo.OnlineID}.mp3");
+            protected override Track GetTrack()
+            {
+                // while capturing system media, previews are silenced so they don't play over the system player.
+                if (systemMediaCapture?.Active == true)
+                    return new TrackVirtual(1000);
+
+                return trackManager.Get($"https://b.ppy.sh/preview/{beatmapSetInfo.OnlineID}.mp3");
+            }
         }
     }
 }
