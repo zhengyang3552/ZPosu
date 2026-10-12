@@ -71,7 +71,7 @@ namespace osu.Game.Screens.Menu
         private MusicController musicController { get; set; }
 
         [Resolved(canBeNull: true)]
-        private SystemMediaCapture? systemMediaCapture { get; set; }
+        private SystemMediaCapture systemMediaCapture { get; set; }
 
         [Resolved]
         private Storage storage { get; set; }
