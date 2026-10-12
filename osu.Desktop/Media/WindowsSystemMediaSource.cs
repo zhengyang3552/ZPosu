@@ -4,7 +4,6 @@
 using System;
 using System.Threading.Tasks;
 using osu.Framework.Audio;
-using osu.Framework.Audio.Track;
 using osu.Framework.Logging;
 using osu.Game.Media;
 using Windows.Media.Control;

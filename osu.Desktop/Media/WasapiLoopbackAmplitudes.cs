@@ -3,7 +3,6 @@
 
 using System;
 using System.Runtime.InteropServices;
-using NAudio.CoreAudioApi;
 using NAudio.Dsp;
 using NAudio.Wave;
 using osu.Framework.Audio;
