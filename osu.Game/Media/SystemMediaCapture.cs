@@ -6,6 +6,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
+using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Textures;
@@ -55,6 +56,11 @@ namespace osu.Game.Media
         /// Whether system media capture is enabled and functional in this session.
         /// </summary>
         public bool Active => captureEnabled.Value && source?.Available == true;
+
+        /// <summary>
+        /// Real-time amplitude data of the system audio output, if the platform backend supports capturing it.
+        /// </summary>
+        public IHasAmplitudes? SystemAudioAmplitudes => source?.AudioAmplitudes;
 
         private SystemMediaCoverStore coverStore = null!;
         private TextureStore? coverTextureStore;

@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using osu.Framework.Audio.Track;
 
 namespace osu.Game.Media
 {
@@ -33,6 +34,11 @@ namespace osu.Game.Media
         /// Raised when the playback state of the system media changes.
         /// </summary>
         event Action<bool>? PlayingChanged;
+
+        /// <summary>
+        /// Real-time amplitude data of the system audio output, if the platform backend supports capturing it.
+        /// </summary>
+        IHasAmplitudes? AudioAmplitudes { get; }
 
         /// <summary>
         /// Skip to the next track in the system player.

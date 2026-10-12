@@ -3,6 +3,7 @@
 
 using System;
 using System.Threading.Tasks;
+using osu.Framework.Audio.Track;
 using osu.Framework.Logging;
 using osu.Game.Media;
 using Windows.Media.Control;
@@ -19,9 +20,13 @@ namespace osu.Desktop.Media
 
         public bool Available => manager != null;
 
+        public IHasAmplitudes? AudioAmplitudes => systemAudioAmplitudes;
+
         public event Action<SystemMediaTrack?>? TrackChanged;
 
         public event Action<bool>? PlayingChanged;
+
+        private readonly WasapiLoopbackAmplitudes systemAudioAmplitudes = new WasapiLoopbackAmplitudes();
 
         private GlobalSystemMediaTransportControlsSessionManager? manager;
         private GlobalSystemMediaTransportControlsSession? session;
@@ -38,6 +43,15 @@ namespace osu.Desktop.Media
 
         private async Task initialise()
         {
+            try
+            {
+                systemAudioAmplitudes.Start();
+            }
+            catch (Exception e)
+            {
+                Logger.Log($"Failed to start system audio capture: {e.Message}", LoggingTarget.Runtime, LogLevel.Important);
+            }
+
             try
             {
                 GlobalSystemMediaTransportControlsSessionManager newManager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync().AsTask().ConfigureAwait(false);

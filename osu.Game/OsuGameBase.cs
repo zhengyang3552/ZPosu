@@ -811,6 +811,16 @@ namespace osu.Game
 
         ControlPointInfo IBeatSyncProvider.ControlPoints => Beatmap.Value.BeatmapLoaded ? Beatmap.Value.Beatmap.ControlPointInfo : null;
         IClock IBeatSyncProvider.Clock => beatmapClock;
-        ChannelAmplitudes IHasAmplitudes.CurrentAmplitudes => Beatmap.Value.TrackLoaded ? Beatmap.Value.Track.CurrentAmplitudes : ChannelAmplitudes.Empty;
+        ChannelAmplitudes IHasAmplitudes.CurrentAmplitudes
+        {
+            get
+            {
+                // while capturing system media, the system audio output provides the amplitudes (osu!'s own track is silent).
+                if (systemMediaCapture?.Active == true && systemMediaCapture.SystemAudioAmplitudes != null)
+                    return systemMediaCapture.SystemAudioAmplitudes.CurrentAmplitudes;
+
+                return Beatmap.Value.TrackLoaded ? Beatmap.Value.Track.CurrentAmplitudes : ChannelAmplitudes.Empty;
+            }
+        }
     }
 }

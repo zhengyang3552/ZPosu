@@ -367,9 +367,13 @@ namespace osu.Game.Screens.Menu
 
             const float scale_adjust_cutoff = 0.4f;
 
-            if (musicController.CurrentTrack.IsRunning)
+            // the beat sync source is capture-aware: while capturing system media it provides the
+            // system audio's amplitudes, otherwise the in-game track's amplitudes.
+            ChannelAmplitudes amplitudes = BeatSyncSource.CurrentAmplitudes;
+
+            if (musicController.CurrentTrack.IsRunning || amplitudes.Maximum > 0)
             {
-                float maxAmplitude = lastBeatIndex >= 0 ? musicController.CurrentTrack.CurrentAmplitudes.Maximum : 0;
+                float maxAmplitude = lastBeatIndex >= 0 ? amplitudes.Maximum : 0;
                 logoAmplitudeContainer.Scale = new Vector2((float)Interpolation.Damp(logoAmplitudeContainer.Scale.X, 1 - Math.Max(0, maxAmplitude - scale_adjust_cutoff) * 0.04f, 0.9f, Time.Elapsed));
 
                 triangles.Velocity = (float)Interpolation.Damp(triangles.Velocity, triangles_paused_velocity * (IsKiaiTime ? 4 : 2), 0.995f, Time.Elapsed);
