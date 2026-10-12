@@ -117,6 +117,10 @@ namespace osu.Game.Beatmaps.Drawables
             {
             }
 
+            // Bundled beatmaps are served from a public CDN without authentication, so they remain
+            // downloadable even in the permanent guest build (unlike server-side beatmap downloads).
+            protected override bool DownloadAvailable => true;
+
             protected override ArchiveDownloadRequest<IBeatmapSetInfo> CreateDownloadRequest(IBeatmapSetInfo set, bool minimiseDownloadSize)
                 => new BundledBeatmapDownloadRequest(set, minimiseDownloadSize);
 

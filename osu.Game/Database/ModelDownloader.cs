@@ -124,7 +124,17 @@ namespace osu.Game.Database
 
         public abstract ArchiveDownloadRequest<T>? GetExistingDownload(T model);
 
-        private bool canDownload(T model) => GetExistingDownload(model) == null && api != null;
+        private bool canDownload(T model) => GetExistingDownload(model) == null && DownloadAvailable;
+
+        /// <summary>
+        /// Whether downloading is available at all in the current build.
+        /// </summary>
+        /// <remarks>
+        /// This build runs in permanent guest mode and the server requires authentication to serve
+        /// downloads, so any download request would fail anyway. Refusing here keeps the failure
+        /// silent instead of surfacing an unactionable network error.
+        /// </remarks>
+        protected virtual bool DownloadAvailable => api?.IsLoggedIn == true;
 
         private partial class DownloadNotification : ProgressNotification
         {

@@ -221,9 +221,6 @@ namespace osu.Game
         private MainMenu menuScreen;
 
         [CanBeNull]
-        private DevBuildBanner devBuildBanner;
-
-        [CanBeNull]
         private IntroScreen introScreen;
 
         private Bindable<string> configRuleset;
@@ -1174,9 +1171,6 @@ namespace osu.Game
                 Margin = new MarginPadding(5),
             }, topMostOverlayContent.Add);
 
-            if (!IsDeployedBuild)
-                loadComponentSingleFile(devBuildBanner = new DevBuildBanner(), ScreenContainer.Add);
-
             loadComponentSingleFile(osuLogo, _ =>
             {
                 osuLogo.SetupDefaultContainer(logoContainer);
@@ -1797,20 +1791,14 @@ namespace osu.Game
             {
                 case IntroScreen intro:
                     introScreen = intro;
-                    devBuildBanner?.Show();
                     break;
 
                 case MainMenu menu:
                     menuScreen = menu;
-                    devBuildBanner?.Show();
                     break;
 
                 case Player player:
                     player.PlayingState.BindTo(UserPlayingState);
-                    break;
-
-                default:
-                    devBuildBanner?.Hide();
                     break;
             }
 

@@ -6,9 +6,10 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Sprites;
+using osu.Game.Online;
+using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Configuration;
-using osu.Game.Online;
 using osu.Game.Resources.Localisation.Web;
 
 namespace osu.Game.Beatmaps.Drawables.Cards.Buttons
@@ -23,6 +24,9 @@ namespace osu.Game.Beatmaps.Drawables.Cards.Buttons
 
         [Resolved]
         private BeatmapModelDownloader beatmaps { get; set; } = null!;
+
+        [Resolved]
+        private IAPIProvider api { get; set; } = null!;
 
         public DownloadButton(APIBeatmapSet beatmapSet)
         {
@@ -67,6 +71,16 @@ namespace osu.Game.Beatmaps.Drawables.Cards.Buttons
                     break;
 
                 case DownloadState.NotDownloaded:
+                    if (!api.IsLoggedIn)
+                    {
+                        // Guest mode: the server requires authentication to serve downloads, so the
+                        // button is disabled rather than presenting an unactionable dead end.
+                        Action = null;
+                        Enabled.Value = false;
+                        TooltipText = string.Empty;
+                        return;
+                    }
+
                     if (beatmapSet.Availability.DownloadDisabled)
                     {
                         Enabled.Value = false;
