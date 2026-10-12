@@ -181,6 +181,8 @@ namespace osu.Game.Configuration
             SetDefault(OsuSetting.MenuBackgroundSource, BackgroundSource.Skin);
             SetDefault(OsuSetting.SeasonalBackgroundMode, SeasonalBackgroundMode.Sometimes);
 
+            SetDefault(OsuSetting.CaptureSystemMedia, false);
+
             SetDefault(OsuSetting.DiscordRichPresence, DiscordRichPresenceMode.Full);
 
             SetDefault(OsuSetting.EditorDim, 0.25f, 0f, 1f, 0.25f);
@@ -457,5 +459,11 @@ namespace osu.Game.Configuration
         /// Blocks private messages, multiplayer room invites, and duel requests from people not on the user's friends list.
         /// </summary>
         PMFriendsOnly,
+
+        /// <summary>
+        /// Whether to capture the media currently playing on the operating system,
+        /// following its cover art in the game background and controlling it via the in-game music controls.
+        /// </summary>
+        CaptureSystemMedia,
     }
 }

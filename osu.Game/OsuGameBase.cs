@@ -48,6 +48,7 @@ using osu.Game.Input;
 using osu.Game.Input.Bindings;
 using osu.Game.IO;
 using osu.Game.Localisation;
+using osu.Game.Media;
 using osu.Game.Online;
 using osu.Game.Online.API;
 using osu.Game.Online.Chat;
@@ -169,6 +170,8 @@ namespace osu.Game
         protected GlobalCursorDisplay GlobalCursorDisplay { get; private set; }
 
         protected MusicController MusicController { get; private set; }
+
+        private SystemMediaCapture systemMediaCapture = null!;
 
         protected IAPIProvider API { get; set; }
 
@@ -394,6 +397,9 @@ namespace osu.Game
             PreviewTrackManager previewTrackManager;
             dependencies.Cache(previewTrackManager = new PreviewTrackManager(BeatmapManager.BeatmapTrackStore));
             base.Content.Add(previewTrackManager);
+
+            base.Content.Add(systemMediaCapture = new SystemMediaCapture());
+            dependencies.CacheAs(systemMediaCapture);
 
             base.Content.Add(MusicController = new MusicController());
             dependencies.CacheAs(MusicController);

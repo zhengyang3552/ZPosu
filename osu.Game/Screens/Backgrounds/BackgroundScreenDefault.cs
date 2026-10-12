@@ -15,6 +15,7 @@ using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Graphics.Backgrounds;
+using osu.Game.Media;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Skinning;
@@ -39,6 +40,11 @@ namespace osu.Game.Screens.Backgrounds
         [Resolved]
         private GameHost gameHost { get; set; }
 
+        [Resolved(canBeNull: true)]
+        private SystemMediaCapture systemMediaCapture { get; set; }
+
+        private Bindable<bool> captureEnabled;
+
         protected virtual bool AllowStoryboardBackground => true;
 
         [BackgroundDependencyLoader]
@@ -48,6 +54,7 @@ namespace osu.Game.Screens.Backgrounds
             skin = skinManager.CurrentSkin.GetBoundCopy();
             source = config.GetBindable<BackgroundSource>(OsuSetting.MenuBackgroundSource);
             introSequence = config.GetBindable<IntroSequence>(OsuSetting.IntroSequence);
+            captureEnabled = config.GetBindable<bool>(OsuSetting.CaptureSystemMedia);
 
             AddInternal(seasonalBackgroundLoader);
         }
@@ -63,11 +70,27 @@ namespace osu.Game.Screens.Backgrounds
             introSequence.ValueChanged += _ => Scheduler.AddOnce(next);
             seasonalBackgroundLoader.SeasonalBackgroundChanged += () => Scheduler.AddOnce(next);
 
+            captureEnabled.BindValueChanged(_ => Scheduler.AddOnce(refreshCaptureBackground));
+
+            if (systemMediaCapture != null)
+            {
+                systemMediaCapture.CurrentTrack.BindValueChanged(_ => Scheduler.AddOnce(refreshCaptureBackground));
+                systemMediaCapture.CoverTexture.BindValueChanged(_ => Scheduler.AddOnce(refreshCaptureBackground));
+            }
+
             currentDisplay = RNG.Next(0, background_count);
             Next();
 
             // helper function required for AddOnce usage.
             void next() => Next();
+
+            void refreshCaptureBackground()
+            {
+                if (systemMediaCapture?.Active == true && systemMediaCapture.CoverTexture.Value != null)
+                    loadBackground(new SystemMediaBackground(systemMediaCapture.CoverTexture.Value));
+                else
+                    Next();
+            }
         }
 
         private ScheduledDelegate storyboardUnloadDelegate;
@@ -104,10 +127,21 @@ namespace osu.Game.Screens.Backgrounds
         /// <returns>Whether a new background was queued for load. May return false if the current background is still valid.</returns>
         public virtual bool Next()
         {
-            var nextBackground = createBackground();
+            if (systemMediaCapture?.Active == true)
+            {
+                // while capturing system media the background follows the system player,
+                // so "next background" cycles the system track instead.
+                systemMediaCapture.Next();
+                return false;
+            }
 
+            return loadBackground(createBackground());
+        }
+
+        private bool loadBackground(Background nextBackground)
+        {
             // in the case that the background hasn't changed, we want to avoid cancelling any tasks that could still be loading.
-            if (nextBackground == background)
+            if (nextBackground == background || nextBackground.Equals(background))
                 return false;
 
             Logger.Log(@"🌅 Global background change queued");

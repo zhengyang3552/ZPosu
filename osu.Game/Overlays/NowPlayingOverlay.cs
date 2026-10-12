@@ -21,6 +21,7 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
+using osu.Game.Media;
 using osu.Game.Overlays.Music;
 using osuTK;
 using osuTK.Graphics;
@@ -69,6 +70,9 @@ namespace osu.Game.Overlays
 
         [Resolved]
         private OsuColour colours { get; set; } = null!;
+
+        [Resolved(canBeNull: true)]
+        private SystemMediaCapture? systemMediaCapture { get; set; }
 
         private Bindable<bool> allowTrackControl = null!;
         private readonly BindableBool shuffle = new BindableBool(true);
@@ -229,6 +233,10 @@ namespace osu.Game.Overlays
 
         private void onSeek(double progress)
         {
+            // seeking the system player is not supported; ignore while capturing.
+            if (systemMediaCapture?.Active == true)
+                return;
+
             if (!musicController.IsPlaying || lastSeekGameTime == null || Time.Current - lastSeekGameTime > TRACK_DRAG_SEEK_DEBOUNCE)
             {
                 musicController.SeekTo(progress);
@@ -239,6 +247,9 @@ namespace osu.Game.Overlays
 
         private void onCommit(double progress)
         {
+            if (systemMediaCapture?.Active == true)
+                return;
+
             // Avoid a second seek to the same location, which could occur when using keyboard navigation from `OnSeek` and subsequent `OnCommit` calls.
             if (progress != lastSeekAudioTargetTime)
                 musicController.SeekTo(progress);
@@ -249,6 +260,10 @@ namespace osu.Game.Overlays
 
         private void togglePlaylist()
         {
+            // song selection is not available while capturing the system player.
+            if (systemMediaCapture?.Active == true)
+                return;
+
             if (playlist == null)
             {
                 LoadComponentAsync(playlist = new PlaylistOverlay
@@ -284,6 +299,15 @@ namespace osu.Game.Overlays
 
             musicController.TrackChanged += trackChanged;
             trackChanged(beatmap.Value);
+
+            if (systemMediaCapture != null)
+            {
+                systemMediaCapture.CaptureEnabled.BindValueChanged(_ => Scheduler.AddOnce(updateCaptureState));
+                systemMediaCapture.CurrentTrack.BindValueChanged(_ => Scheduler.AddOnce(updateCaptureState));
+                systemMediaCapture.CoverTexture.BindValueChanged(_ => Scheduler.AddOnce(updateCaptureBackground));
+            }
+
+            updateCaptureState();
         }
 
         protected override void PopIn()
@@ -324,8 +348,18 @@ namespace osu.Game.Overlays
 
             if (pendingBeatmapSwitch != null)
             {
-                pendingBeatmapSwitch();
+                // don't switch to the beatmap display while capturing the system player.
+                if (systemMediaCapture?.Active != true)
+                    pendingBeatmapSwitch();
                 pendingBeatmapSwitch = null;
+            }
+
+            if (systemMediaCapture?.Active == true)
+            {
+                progressBar.CurrentTime = 0;
+                progressBar.EndTime = 1;
+                playButton.Icon = systemMediaCapture.IsPlaying.Value ? FontAwesome.Regular.PauseCircle : FontAwesome.Regular.PlayCircle;
+                return;
             }
 
             var track = musicController.CurrentTrack;
@@ -361,67 +395,146 @@ namespace osu.Game.Overlays
             // avoid using scheduler as our scheduler may not be run for a long time, holding references to beatmaps.
             pendingBeatmapSwitch = delegate
             {
-                BeatmapMetadata metadata = beatmap.Metadata;
+                applyMetadata(beatmap);
+                loadPlayerBackground(beatmap, direction);
+            };
+        }
+
+        private void applyMetadata(WorkingBeatmap beatmap)
+        {
+            BeatmapMetadata metadata = beatmap.Metadata;
+
+            title.CreateContent = () => new OsuSpriteText
+            {
+                Text = new RomanisableString(metadata.TitleUnicode, metadata.Title),
+                Font = title_font,
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+            };
+            artist.CreateContent = () => new OsuSpriteText
+            {
+                Text = new RomanisableString(metadata.ArtistUnicode, metadata.Artist),
+                Font = artist_font,
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+            };
+        }
+
+        private void loadPlayerBackground(WorkingBeatmap beatmap, TrackChangeDirection direction)
+        {
+            backgroundLoadCancellation?.Cancel();
+
+            LoadComponentAsync(new Background(beatmap) { Depth = float.MaxValue }, newBackground =>
+            {
+                if (beatmap != currentBeatmap)
+                {
+                    newBackground.Dispose();
+                    return;
+                }
+
+                switch (direction)
+                {
+                    case TrackChangeDirection.Next:
+                        newBackground.Position = new Vector2(player_width, 0);
+                        newBackground.MoveToX(0, 500, Easing.OutCubic);
+                        background.MoveToX(-player_width, 500, Easing.OutCubic);
+                        break;
+
+                    case TrackChangeDirection.Prev:
+                        newBackground.Position = new Vector2(-player_width, 0);
+                        newBackground.MoveToX(0, 500, Easing.OutCubic);
+                        background.MoveToX(player_width, 500, Easing.OutCubic);
+                        break;
+                }
+
+                background.Expire();
+                background = newBackground;
+
+                playerContainer.Add(newBackground);
+            }, (backgroundLoadCancellation = new CancellationTokenSource()).Token);
+        }
+
+        /// <summary>
+        /// Updates the track info display to show the captured system track while capture is active,
+        /// or restore the beatmap display otherwise.
+        /// </summary>
+        private void updateCaptureState()
+        {
+            bool captureActive = systemMediaCapture?.Active == true;
+
+            if (captureActive)
+            {
+                var track = systemMediaCapture!.CurrentTrack.Value;
 
                 title.CreateContent = () => new OsuSpriteText
                 {
-                    Text = new RomanisableString(metadata.TitleUnicode, metadata.Title),
+                    Text = string.IsNullOrEmpty(track?.Title) ? @"Nothing playing" : track!.Title,
                     Font = title_font,
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
                 };
                 artist.CreateContent = () => new OsuSpriteText
                 {
-                    Text = new RomanisableString(metadata.ArtistUnicode, metadata.Artist),
+                    Text = track?.Artist ?? string.Empty,
                     Font = artist_font,
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
                 };
+            }
+            else if (currentBeatmap != null)
+                applyMetadata(currentBeatmap);
 
-                backgroundLoadCancellation?.Cancel();
+            if (captureActive != lastCaptureActive)
+            {
+                lastCaptureActive = captureActive;
+                updateCaptureBackground();
+            }
 
-                LoadComponentAsync(new Background(beatmap) { Depth = float.MaxValue }, newBackground =>
-                {
-                    if (beatmap != currentBeatmap)
-                    {
-                        newBackground.Dispose();
-                        return;
-                    }
+            updateEnabledStates();
+        }
 
-                    switch (direction)
-                    {
-                        case TrackChangeDirection.Next:
-                            newBackground.Position = new Vector2(player_width, 0);
-                            newBackground.MoveToX(0, 500, Easing.OutCubic);
-                            background.MoveToX(-player_width, 500, Easing.OutCubic);
-                            break;
+        private bool lastCaptureActive;
 
-                        case TrackChangeDirection.Prev:
-                            newBackground.Position = new Vector2(-player_width, 0);
-                            newBackground.MoveToX(0, 500, Easing.OutCubic);
-                            background.MoveToX(player_width, 500, Easing.OutCubic);
-                            break;
-                    }
+        /// <summary>
+        /// Shows the captured system track's cover art in the player background while capture is active,
+        /// or restores the beatmap background otherwise.
+        /// </summary>
+        private void updateCaptureBackground()
+        {
+            if (systemMediaCapture?.Active != true || systemMediaCapture.CoverTexture.Value == null)
+            {
+                if (currentBeatmap != null)
+                    loadPlayerBackground(currentBeatmap, TrackChangeDirection.None);
 
-                    background.Expire();
-                    background = newBackground;
+                return;
+            }
 
-                    playerContainer.Add(newBackground);
-                }, (backgroundLoadCancellation = new CancellationTokenSource()).Token);
-            };
+            var cover = systemMediaCapture.CoverTexture.Value!;
+
+            backgroundLoadCancellation?.Cancel();
+
+            LoadComponentAsync(new CoverBackground(cover) { Depth = float.MaxValue }, newBackground =>
+            {
+                background.Expire();
+                background = newBackground;
+
+                playerContainer.Add(newBackground);
+            }, (backgroundLoadCancellation = new CancellationTokenSource()).Token);
         }
 
         private void updateEnabledStates()
         {
             bool beatmapDisabled = beatmap.Disabled;
             bool trackControlDisabled = !musicController.AllowTrackControl.Value;
+            bool captureActive = systemMediaCapture?.Active == true;
 
-            if (beatmapDisabled || trackControlDisabled)
+            if (beatmapDisabled || trackControlDisabled || captureActive)
                 playlist?.Hide();
 
             prevButton.Enabled.Value = !beatmapDisabled && !trackControlDisabled;
             nextButton.Enabled.Value = !beatmapDisabled && !trackControlDisabled;
-            playlistButton.Enabled.Value = !beatmapDisabled && !trackControlDisabled;
+            playlistButton.Enabled.Value = !beatmapDisabled && !trackControlDisabled && !captureActive;
+            shuffleButton.Enabled.Value = !captureActive;
             playButton.Enabled.Value = !trackControlDisabled;
         }
 
@@ -495,6 +608,47 @@ namespace osu.Game.Overlays
             private void load(LargeTextureStore textures)
             {
                 sprite.Texture = beatmap.GetBackground() ?? textures.Get(@"Backgrounds/bg2");
+            }
+        }
+
+        private partial class CoverBackground : BufferedContainer
+        {
+            private readonly Sprite sprite;
+            private readonly Texture cover;
+
+            public CoverBackground(Texture cover)
+                : base(cachedFrameBuffer: true)
+            {
+                this.cover = cover;
+
+                Depth = float.MaxValue;
+                RelativeSizeAxes = Axes.Both;
+
+                Children = new Drawable[]
+                {
+                    sprite = new Sprite
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Colour = OsuColour.Gray(180),
+                        FillMode = FillMode.Fill,
+                        Anchor = Anchor.Centre,
+                        Origin = Anchor.Centre,
+                    },
+                    new Box
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        Height = bottom_black_area_height,
+                        Origin = Anchor.BottomCentre,
+                        Anchor = Anchor.BottomCentre,
+                        Colour = Color4.Black.Opacity(0.5f)
+                    }
+                };
+            }
+
+            [BackgroundDependencyLoader]
+            private void load()
+            {
+                sprite.Texture = cover;
             }
         }
 

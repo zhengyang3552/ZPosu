@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Runtime.Versioning;
 using Microsoft.Win32;
 using osu.Desktop.IPC;
+using osu.Desktop.Media;
 using osu.Desktop.Performance;
 using osu.Desktop.Security;
 using osu.Framework.Platform;
@@ -21,6 +22,7 @@ using osu.Framework.Allocation;
 using osu.Game.Configuration;
 using osu.Game.IO;
 using osu.Game.IPC;
+using osu.Game.Media;
 using osu.Game.Performance;
 using osu.Game.Utils;
 
@@ -33,6 +35,13 @@ namespace osu.Desktop
 
         [Cached(typeof(IHighPerformanceSessionManager))]
         private readonly HighPerformanceSessionManager highPerformanceSessionManager = new HighPerformanceSessionManager();
+
+        /// <summary>
+        /// Tracks the media currently playing on the operating system (Windows SMTC), used by
+        /// <see cref="SystemMediaCapture"/> when the user enables the "capture system music" setting.
+        /// </summary>
+        [Cached(typeof(ISystemMediaSource))]
+        private readonly WindowsSystemMediaSource systemMediaSource = new WindowsSystemMediaSource();
 
         public bool IsFirstRun { get; init; }
 
