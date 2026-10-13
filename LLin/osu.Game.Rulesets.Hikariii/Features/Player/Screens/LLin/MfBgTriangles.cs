@@ -1,12 +1,15 @@
 using System.Linq;
 using osu.Framework.Allocation;
+using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Backgrounds;
+using osu.Game.Media;
 using osu.Game.Rulesets.Hikariii.Features.Player.Interfaces;
+using osu.Game.Rulesets.Hikariii.Features.Player.Misc;
 using osu.Game.Rulesets.Hikariii.ppyStuffs.osu;
 using osuTK.Graphics;
 
@@ -114,11 +117,15 @@ namespace osu.Game.Rulesets.Hikariii.Features.Player.Screens.LLin
             [Resolved]
             private IBindable<WorkingBeatmap> b { get; set; } = null!;
 
+            [Resolved(canBeNull: true)]
+            private SystemMediaCapture? systemMediaCapture { get; set; }
+
             protected override void Update()
             {
                 if (!AllowBeatSync) return;
 
-                float[] amplitudes = b.Value?.Track.CurrentAmplitudes.FrequencyAmplitudes.ToArray() ?? new float[256];
+                // while system media capture is active the in-game track is silent, so the captured system audio drives the visuals instead.
+                float[] amplitudes = MusicAmplitudeCompat.GetFrequencyAmplitudes(systemMediaCapture, b.Value?.Track.CurrentAmplitudes ?? ChannelAmplitudes.Empty);
                 bool isKiai = b.Value?.Beatmap.ControlPointInfo.EffectPointAt(b.Value?.Track?.CurrentTime ?? 0).KiaiMode ?? false;
                 float totalSum = 0.1f + amplitudes.Sum();
 

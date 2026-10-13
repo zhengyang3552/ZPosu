@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.IO;
 using System.Threading.Tasks;
 using osu.Framework.Audio;
 using osu.Framework.Logging;
@@ -59,9 +60,11 @@ namespace osu.Desktop.Media
                 newManager.CurrentSessionChanged += onCurrentSessionChanged;
 
                 manager = newManager;
-                bindSession(newManager.GetCurrentSession());
 
-                Logger.Log($"System media metadata (SMTC) initialised; current session: {newManager.GetCurrentSession()?.SourceAppUserModelId ?? "none"}", LoggingTarget.Runtime, LogLevel.Important);
+                GlobalSystemMediaTransportControlsSession? preferredSession = getPreferredSession(newManager);
+                bindSession(preferredSession);
+
+                Logger.Log($"System media metadata (SMTC) initialised; current session: {preferredSession?.SourceAppUserModelId ?? "none"}", LoggingTarget.Runtime, LogLevel.Important);
             }
             catch (Exception e)
             {
@@ -70,7 +73,54 @@ namespace osu.Desktop.Media
         }
 
         private void onCurrentSessionChanged(GlobalSystemMediaTransportControlsSessionManager sender, CurrentSessionChangedEventArgs args)
-            => bindSession(sender.GetCurrentSession());
+            => bindSession(getPreferredSession(sender));
+
+        /// <summary>
+        /// Picks the session which should be treated as the currently playing system media.
+        /// osu! itself publishes a media session through the bundled LLin plugin's media integration,
+        /// so sessions belonging to this process are ignored in favour of other applications' sessions.
+        /// </summary>
+        private static GlobalSystemMediaTransportControlsSession? getPreferredSession(GlobalSystemMediaTransportControlsSessionManager sessionManager)
+        {
+            try
+            {
+                GlobalSystemMediaTransportControlsSession? fallback = null;
+
+                foreach (GlobalSystemMediaTransportControlsSession candidate in sessionManager.GetSessions())
+                {
+                    if (isOwnSession(candidate))
+                        continue;
+
+                    fallback ??= candidate;
+
+                    try
+                    {
+                        if (candidate.GetPlaybackInfo().PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing)
+                            return candidate;
+                    }
+                    catch
+                    {
+                        // the session can no longer be queried; move on to the next one.
+                    }
+                }
+
+                return fallback;
+            }
+            catch
+            {
+                return sessionManager.GetCurrentSession();
+            }
+        }
+
+        private static bool isOwnSession(GlobalSystemMediaTransportControlsSession candidate)
+        {
+            string ownExecutable = Path.GetFileNameWithoutExtension(Environment.ProcessPath ?? string.Empty);
+
+            if (string.IsNullOrEmpty(ownExecutable))
+                return false;
+
+            return candidate.SourceAppUserModelId?.Contains(ownExecutable, StringComparison.OrdinalIgnoreCase) == true;
+        }
 
         private void bindSession(GlobalSystemMediaTransportControlsSession? newSession)
         {
