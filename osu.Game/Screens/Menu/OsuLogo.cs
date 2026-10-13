@@ -437,12 +437,13 @@ namespace osu.Game.Screens.Menu
 
             lowEnergy /= lowBins;
 
-            // slowly adapting average of the low band, used as a threshold.
-            lowBandAverage += (lowEnergy - lowBandAverage) * 0.05f;
+            // slowly adapting average of the low band, used as a threshold (frame-rate independent smoothing).
+            float blend = (float)Math.Clamp(Time.Elapsed / 500.0, 0, 0.5);
+            lowBandAverage += (lowEnergy - lowBandAverage) * blend;
 
             double now = Time.Current;
 
-            if (lowEnergy > 0.08f && lowEnergy > lowBandAverage * 1.5f && now - lastCaptureBeatTime > 160)
+            if (lowEnergy > 0.03f && lowEnergy > lowBandAverage * 1.5f && now - lastCaptureBeatTime > 160)
             {
                 if (lastCaptureBeatTime > 0)
                 {

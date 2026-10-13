@@ -4,7 +4,6 @@
 using System;
 using System.Runtime.InteropServices;
 using NAudio.CoreAudioApi;
-using NAudio.Dsp;
 using NAudio.Wave;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
@@ -19,7 +18,6 @@ namespace osu.Desktop.Media
     public class WasapiLoopbackAmplitudes : IHasAmplitudes, IDisposable
     {
         private const int fft_points = 2048; // must be a power of two.
-        private const int fft_power = 11; // log2(fft_points).
         private const int amplitudes_size = ChannelAmplitudes.AMPLITUDES_SIZE;
 
         /// <summary>
@@ -27,7 +25,8 @@ namespace osu.Desktop.Media
         /// </summary>
         private const int min_samples_between_updates = fft_points / 4;
 
-        private readonly Complex[] fftData = new Complex[fft_points];
+        private readonly float[] fftReal = new float[fft_points];
+        private readonly float[] fftImaginary = new float[fft_points];
         private readonly float[] sampleRing = new float[fft_points];
 
         private int ringPosition;
@@ -145,6 +144,10 @@ namespace osu.Desktop.Media
         /// </summary>
         private bool tryReadMono(ReadOnlySpan<byte> data, WaveFormat format, int channels, int frames, float[] destination)
         {
+            // the mix format is often multichannel (e.g. 7.1) while the actual content lives in the front stereo pair,
+            // so only the first two channels are mixed down (averaging all of them would attenuate the signal heavily).
+            int usedChannels = Math.Min(channels, 2);
+
             switch (format.Encoding)
             {
                 case WaveFormatEncoding.IeeeFloat when format.BitsPerSample == 32:
@@ -155,10 +158,10 @@ namespace osu.Desktop.Media
                     {
                         float sum = 0;
 
-                        for (int channel = 0; channel < channels; channel++)
+                        for (int channel = 0; channel < usedChannels; channel++)
                             sum += samples[frame * channels + channel];
 
-                        destination[frame] = sum / channels;
+                        destination[frame] = sum / usedChannels;
                     }
 
                     return true;
@@ -172,10 +175,10 @@ namespace osu.Desktop.Media
                     {
                         float sum = 0;
 
-                        for (int channel = 0; channel < channels; channel++)
+                        for (int channel = 0; channel < usedChannels; channel++)
                             sum += samples[frame * channels + channel] / 32768f;
 
-                        destination[frame] = sum / channels;
+                        destination[frame] = sum / usedChannels;
                     }
 
                     return true;
@@ -187,7 +190,7 @@ namespace osu.Desktop.Media
                     {
                         float sum = 0;
 
-                        for (int channel = 0; channel < channels; channel++)
+                        for (int channel = 0; channel < usedChannels; channel++)
                         {
                             int offset = (frame * channels + channel) * 3;
                             int value = data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16);
@@ -199,7 +202,7 @@ namespace osu.Desktop.Media
                             sum += value / 8388608f;
                         }
 
-                        destination[frame] = sum / channels;
+                        destination[frame] = sum / usedChannels;
                     }
 
                     return true;
@@ -213,10 +216,10 @@ namespace osu.Desktop.Media
                     {
                         float sum = 0;
 
-                        for (int channel = 0; channel < channels; channel++)
+                        for (int channel = 0; channel < usedChannels; channel++)
                             sum += samples[frame * channels + channel] / 2147483648f;
 
-                        destination[frame] = sum / channels;
+                        destination[frame] = sum / usedChannels;
                     }
 
                     return true;
@@ -271,14 +274,12 @@ namespace osu.Desktop.Media
         {
             for (int i = 0; i < fft_points; i++)
             {
-                int sampleIndex = (ringPosition - fft_points + i + fft_points) % fft_points;
-                var complex = fftData[i];
-                complex.X = sampleRing[sampleIndex] * (float)FastFourierTransform.HannWindow(i, fft_points);
-                complex.Y = 0;
-                fftData[i] = complex;
+                int sampleIndex = (ringPosition + i) % fft_points;
+                fftReal[i] = sampleRing[sampleIndex] * hannWindow(i, fft_points);
+                fftImaginary[i] = 0;
             }
 
-            FastFourierTransform.FFT(true, fft_power, fftData);
+            fft(fftReal, fftImaginary);
 
             float[] bins = new float[amplitudes_size];
             int usefulBins = fft_points / 2;
@@ -292,18 +293,77 @@ namespace osu.Desktop.Media
 
                 for (int j = start; j < end; j++)
                 {
-                    float real = fftData[j].X;
-                    float imaginary = fftData[j].Y;
+                    float real = fftReal[j];
+                    float imaginary = fftImaginary[j];
                     sum += MathF.Sqrt(real * real + imaginary * imaginary);
                 }
 
-                // a full-scale sine lands near 1.0 after this normalisation (Hann window halves the peak magnitude).
-                float amplitude = sum / (end - start) / (fft_points / 2f) * 2;
+                // a full-scale sine lands near 1.0 after this normalisation.
+                float amplitude = sum / (end - start) / (fft_points / 2f) * 4;
 
                 bins[i] = Math.Clamp(amplitude, 0, 1);
             }
 
             latestAmplitudes = bins;
+        }
+
+        private static float hannWindow(int index, int size) => (float)(0.5 * (1 - Math.Cos(2 * Math.PI * index / (size - 1))));
+
+        /// <summary>
+        /// Computes an in-place iterative radix-2 FFT. The length of the data must be a power of two.
+        /// </summary>
+        private static void fft(float[] real, float[] imaginary)
+        {
+            int n = real.Length;
+
+            // bit-reversal permutation.
+            for (int i = 1, j = 0; i < n; i++)
+            {
+                int bit = n >> 1;
+
+                for (; (j & bit) != 0; bit >>= 1)
+                    j ^= bit;
+
+                j ^= bit;
+
+                if (i < j)
+                {
+                    (real[i], real[j]) = (real[j], real[i]);
+                    (imaginary[i], imaginary[j]) = (imaginary[j], imaginary[i]);
+                }
+            }
+
+            for (int length = 2; length <= n; length <<= 1)
+            {
+                double angle = -2 * Math.PI / length;
+                float stepReal = (float)Math.Cos(angle);
+                float stepImaginary = (float)Math.Sin(angle);
+                int half = length >> 1;
+
+                for (int i = 0; i < n; i += length)
+                {
+                    float weightReal = 1;
+                    float weightImaginary = 0;
+
+                    for (int j = 0; j < half; j++)
+                    {
+                        int even = i + j;
+                        int odd = even + half;
+
+                        float oddReal = real[odd] * weightReal - imaginary[odd] * weightImaginary;
+                        float oddImaginary = real[odd] * weightImaginary + imaginary[odd] * weightReal;
+
+                        real[odd] = real[even] - oddReal;
+                        imaginary[odd] = imaginary[even] - oddImaginary;
+                        real[even] += oddReal;
+                        imaginary[even] += oddImaginary;
+
+                        float nextWeightReal = weightReal * stepReal - weightImaginary * stepImaginary;
+                        weightImaginary = weightReal * stepImaginary + weightImaginary * stepReal;
+                        weightReal = nextWeightReal;
+                    }
+                }
+            }
         }
 
         public void Dispose()
