@@ -21,6 +21,7 @@ using osu.Framework.Utils;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Graphics.Backgrounds;
 using osu.Game.Graphics.Containers;
+using osu.Game.Media;
 using osu.Game.Overlays;
 using osuTK;
 using osuTK.Graphics;
@@ -292,6 +293,11 @@ namespace osu.Game.Screens.Menu
         {
             base.OnNewBeat(beatIndex, timingPoint, effectPoint, amplitudes);
 
+            // while capturing system media the menu's own beatmap timing is irrelevant;
+            // beats are derived from the captured system audio instead (see updateCaptureBeats).
+            if (systemMediaCapture?.Active == true)
+                return;
+
             lastBeatIndex = beatIndex;
 
             double beatLength = timingPoint.BeatLength;
@@ -361,6 +367,22 @@ namespace osu.Game.Screens.Menu
         [Resolved]
         private MusicController musicController { get; set; }
 
+        [Resolved(canBeNull: true)]
+        private SystemMediaCapture systemMediaCapture { get; set; }
+
+        /// <summary>
+        /// Slow-moving average of the low-frequency energy of the captured system audio, used as an
+        /// adaptive threshold for beat detection while capturing system media.
+        /// </summary>
+        private float lowBandAverage;
+
+        /// <summary>
+        /// The measured interval between recent detected beats, in milliseconds.
+        /// </summary>
+        private double captureBeatInterval = 400;
+
+        private double lastCaptureBeatTime;
+
         protected override void Update()
         {
             base.Update();
@@ -370,6 +392,11 @@ namespace osu.Game.Screens.Menu
             // the beat sync source is capture-aware: while capturing system media it provides the
             // system audio's amplitudes, otherwise the in-game track's amplitudes.
             ChannelAmplitudes amplitudes = BeatSyncSource.CurrentAmplitudes;
+
+            // while capturing system media there is no beatmap timing to sync to,
+            // so drive the beat animation from onsets detected in the captured audio.
+            if (systemMediaCapture?.Active == true)
+                updateCaptureBeats(amplitudes);
 
             if (musicController.CurrentTrack.IsRunning || amplitudes.Maximum > 0)
             {
@@ -382,6 +409,63 @@ namespace osu.Game.Screens.Menu
             {
                 triangles.Velocity = (float)Interpolation.Damp(triangles.Velocity, triangles_paused_velocity, 0.9f, Time.Elapsed);
             }
+        }
+
+        /// <summary>
+        /// Detects beats (onsets) in the captured system audio and triggers the beat animation
+        /// accordingly, as there is no beatmap timing available while capturing system media.
+        /// </summary>
+        private void updateCaptureBeats(ChannelAmplitudes amplitudes)
+        {
+            ReadOnlySpan<float> bins = amplitudes.FrequencyAmplitudes.Span;
+
+            // the low band (roughly below ~1.5kHz) is a decent proxy for kicks and other onsets.
+            int lowBins = Math.Min(24, bins.Length);
+            float lowEnergy = 0;
+
+            for (int i = 0; i < lowBins; i++)
+                lowEnergy += bins[i];
+
+            lowEnergy /= lowBins;
+
+            // slowly adapting average of the low band, used as a threshold.
+            lowBandAverage += (lowEnergy - lowBandAverage) * 0.05f;
+
+            double now = Time.Current;
+
+            if (lowEnergy > 0.08f && lowEnergy > lowBandAverage * 1.5f && now - lastCaptureBeatTime > 160)
+            {
+                if (lastCaptureBeatTime > 0)
+                {
+                    double interval = now - lastCaptureBeatTime;
+
+                    if (interval is > 200 and < 1500)
+                        captureBeatInterval += (interval - captureBeatInterval) * 0.2;
+                }
+
+                lastCaptureBeatTime = now;
+                lastBeatIndex = Math.Max(lastBeatIndex, 0);
+
+                triggerCaptureBeatAnimation();
+            }
+        }
+
+        private void triggerCaptureBeatAnimation()
+        {
+            float amplitudeAdjust = Math.Min(1, 0.4f + BeatSyncSource.CurrentAmplitudes.Maximum);
+            double beatLength = captureBeatInterval;
+
+            logoBeatContainer
+                .ScaleTo(1 - 0.02f * amplitudeAdjust, early_activation, Easing.Out).Then()
+                .ScaleTo(1, beatLength, Easing.OutQuint);
+
+            ripple.ClearTransforms();
+            ripple
+                .ScaleTo(logoAmplitudeContainer.Scale)
+                .ScaleTo(logoAmplitudeContainer.Scale * (1 + 0.04f * amplitudeAdjust), beatLength, Easing.OutQuint)
+                .FadeTo(0.15f * amplitudeAdjust).FadeOut(beatLength, Easing.OutQuint);
+
+            triangles.Velocity += amplitudeAdjust * 3;
         }
 
         public override bool HandlePositionalInput => base.HandlePositionalInput && Alpha > 0.2f;

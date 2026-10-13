@@ -3,10 +3,12 @@
 
 using System;
 using System.Runtime.InteropServices;
+using NAudio.CoreAudioApi;
 using NAudio.Dsp;
 using NAudio.Wave;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
+using osu.Framework.Logging;
 
 namespace osu.Desktop.Media
 {
@@ -46,6 +48,17 @@ namespace osu.Desktop.Media
 
         private WasapiLoopbackCapture? capture;
 
+        /// <summary>
+        /// The capture format normalised to a plain PCM / IEEE float format (the device mix format is
+        /// usually <see cref="WaveFormatExtensible"/>, which needs unpacking before samples can be read).
+        /// </summary>
+        private WaveFormat? captureFormat;
+
+        private float[] monoScratch = new float[16384];
+
+        private bool reportedUnsupportedFormat;
+        private bool reportedFirstData;
+
         public ChannelAmplitudes CurrentAmplitudes => new ChannelAmplitudes(latestPeak, latestPeak, latestAmplitudes);
 
         /// <summary>
@@ -60,8 +73,28 @@ namespace osu.Desktop.Media
 
                 var loopbackCapture = new WasapiLoopbackCapture();
                 loopbackCapture.DataAvailable += onDataAvailable;
-                loopbackCapture.StartRecording();
+
+                // the format must be resolved before the capture is marked ready, as it is read from the capture thread.
+                captureFormat = loopbackCapture.WaveFormat.AsStandardWaveFormat();
                 capture = loopbackCapture;
+
+                loopbackCapture.StartRecording();
+
+                Logger.Log($"System audio capture started on \"{describeDevice()}\" ({captureFormat})", LoggingTarget.Runtime, LogLevel.Important);
+            }
+        }
+
+        private static string describeDevice()
+        {
+            try
+            {
+                using var enumerator = new MMDeviceEnumerator();
+                using var device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+                return device.FriendlyName;
+            }
+            catch
+            {
+                return "unknown device";
             }
         }
 
@@ -69,23 +102,48 @@ namespace osu.Desktop.Media
         {
             try
             {
-                WasapiLoopbackCapture? currentCapture = capture;
-                if (currentCapture == null)
+                WaveFormat? format = captureFormat;
+
+                if (capture == null || format == null)
                     return;
 
-                if (currentCapture.WaveFormat.Encoding != WaveFormatEncoding.IeeeFloat)
+                int channels = format.Channels;
+                int bytesPerSample = format.BitsPerSample / 8;
+
+                if (channels <= 0 || bytesPerSample <= 0)
                     return;
 
-                int channels = currentCapture.WaveFormat.Channels;
-                int bytesPerSample = currentCapture.WaveFormat.BitsPerSample / 8; // 4 for IEEE float.
-                int usableBytes = e.BytesRecorded - e.BytesRecorded % bytesPerSample;
+                int usableBytes = e.BytesRecorded - e.BytesRecorded % (bytesPerSample * channels);
+                int frames = usableBytes / bytesPerSample / channels;
+
+                if (frames == 0)
+                    return;
+
+                if (monoScratch.Length < frames)
+                    monoScratch = new float[Math.Max(frames, monoScratch.Length * 2)];
+
+                if (!tryReadMono(e.Buffer.AsSpan(0, usableBytes), format, channels, frames, monoScratch))
+                    return;
 
                 lock (processingLock)
-                {
-                    ReadOnlySpan<float> samples = MemoryMarshal.Cast<byte, float>(e.Buffer.AsSpan(0, usableBytes));
-                    int frames = samples.Length / channels;
+                    pushMono(monoScratch.AsSpan(0, frames), frames);
+            }
+            catch
+            {
+                // never let capture failures propagate into the audio thread.
+            }
+        }
 
-                    float peak = 0;
+        /// <summary>
+        /// Decodes and downmixes the raw capture buffer into <paramref name="destination"/> as mono floats (-1..1).
+        /// </summary>
+        private bool tryReadMono(ReadOnlySpan<byte> data, WaveFormat format, int channels, int frames, float[] destination)
+        {
+            switch (format.Encoding)
+            {
+                case WaveFormatEncoding.IeeeFloat when format.BitsPerSample == 32:
+                {
+                    ReadOnlySpan<float> samples = MemoryMarshal.Cast<byte, float>(data);
 
                     for (int frame = 0; frame < frames; frame++)
                     {
@@ -94,29 +152,112 @@ namespace osu.Desktop.Media
                         for (int channel = 0; channel < channels; channel++)
                             sum += samples[frame * channels + channel];
 
-                        float mono = sum / channels;
-
-                        sampleRing[ringPosition] = mono;
-                        ringPosition = (ringPosition + 1) % fft_points;
-                        totalSamples++;
-
-                        float absolute = Math.Abs(mono);
-                        if (absolute > peak)
-                            peak = absolute;
+                        destination[frame] = sum / channels;
                     }
 
-                    latestPeak = peak;
+                    return true;
+                }
 
-                    if (totalSamples - lastFftSampleCount >= min_samples_between_updates)
+                case WaveFormatEncoding.Pcm when format.BitsPerSample == 16:
+                {
+                    ReadOnlySpan<short> samples = MemoryMarshal.Cast<byte, short>(data);
+
+                    for (int frame = 0; frame < frames; frame++)
                     {
-                        lastFftSampleCount = totalSamples;
-                        recomputeAmplitudes();
+                        float sum = 0;
+
+                        for (int channel = 0; channel < channels; channel++)
+                            sum += samples[frame * channels + channel] / 32768f;
+
+                        destination[frame] = sum / channels;
                     }
+
+                    return true;
+                }
+
+                case WaveFormatEncoding.Pcm when format.BitsPerSample == 24:
+                {
+                    for (int frame = 0; frame < frames; frame++)
+                    {
+                        float sum = 0;
+
+                        for (int channel = 0; channel < channels; channel++)
+                        {
+                            int offset = (frame * channels + channel) * 3;
+                            int value = data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16);
+
+                            // sign-extend the 24-bit sample.
+                            if ((data[offset + 2] & 0x80) != 0)
+                                value |= unchecked((int)0xFF000000);
+
+                            sum += value / 8388608f;
+                        }
+
+                        destination[frame] = sum / channels;
+                    }
+
+                    return true;
+                }
+
+                case WaveFormatEncoding.Pcm when format.BitsPerSample == 32:
+                {
+                    ReadOnlySpan<int> samples = MemoryMarshal.Cast<byte, int>(data);
+
+                    for (int frame = 0; frame < frames; frame++)
+                    {
+                        float sum = 0;
+
+                        for (int channel = 0; channel < channels; channel++)
+                            sum += samples[frame * channels + channel] / 2147483648f;
+
+                        destination[frame] = sum / channels;
+                    }
+
+                    return true;
+                }
+
+                default:
+                {
+                    if (!reportedUnsupportedFormat)
+                    {
+                        reportedUnsupportedFormat = true;
+                        Logger.Log($"Unsupported system audio capture format ({format}); audio amplitudes will not be available.", LoggingTarget.Runtime, LogLevel.Important);
+                    }
+
+                    return false;
                 }
             }
-            catch
+        }
+
+        private void pushMono(ReadOnlySpan<float> mono, int count)
+        {
+            float peak = 0;
+
+            for (int i = 0; i < count; i++)
             {
-                // never let capture failures propagate into the audio thread.
+                float sample = mono[i];
+
+                sampleRing[ringPosition] = sample;
+                ringPosition = (ringPosition + 1) % fft_points;
+                totalSamples++;
+
+                float absolute = Math.Abs(sample);
+                if (absolute > peak)
+                    peak = absolute;
+            }
+
+            latestPeak = peak;
+
+            if (!reportedFirstData && peak > 0.001f)
+            {
+                reportedFirstData = true;
+                Logger.Log("System audio capture is receiving audio data.", LoggingTarget.Runtime, LogLevel.Important);
+            }
+
+            if (totalSamples - lastFftSampleCount >= min_samples_between_updates)
+            {
+                lastFftSampleCount = totalSamples;
+                recomputeAmplitudes();
             }
         }
 
@@ -166,6 +307,7 @@ namespace osu.Desktop.Media
                 capture?.StopRecording();
                 capture?.Dispose();
                 capture = null;
+                captureFormat = null;
             }
         }
     }
