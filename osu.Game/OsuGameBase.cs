@@ -816,7 +816,7 @@ namespace osu.Game
             get
             {
                 // while capturing system media, the system audio output provides the amplitudes (osu!'s own track is silent).
-                if (systemMediaCapture?.Active == true && systemMediaCapture.SystemAudioAmplitudes != null)
+                if (systemMediaCapture?.AmplitudesActive == true && systemMediaCapture.SystemAudioAmplitudes != null)
                     return systemMediaCapture.SystemAudioAmplitudes.CurrentAmplitudes;
 
                 return Beatmap.Value.TrackLoaded ? Beatmap.Value.Track.CurrentAmplitudes : ChannelAmplitudes.Empty;

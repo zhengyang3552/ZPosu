@@ -17,6 +17,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Input.Events;
+using osu.Framework.Logging;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Graphics.Backgrounds;
@@ -383,6 +384,8 @@ namespace osu.Game.Screens.Menu
 
         private double lastCaptureBeatTime;
 
+        private double lastDiagnosticTime;
+
         protected override void Update()
         {
             base.Update();
@@ -392,6 +395,12 @@ namespace osu.Game.Screens.Menu
             // the beat sync source is capture-aware: while capturing system media it provides the
             // system audio's amplitudes, otherwise the in-game track's amplitudes.
             ChannelAmplitudes amplitudes = BeatSyncSource.CurrentAmplitudes;
+
+            if (Time.Current - lastDiagnosticTime > 5000 && systemMediaCapture?.CaptureEnabled.Value == true)
+            {
+                lastDiagnosticTime = Time.Current;
+                Logger.Log($"Menu visualiser amplitude source: provider={BeatSyncSource.GetType().Name} max={amplitudes.Maximum:0.0000}", LoggingTarget.Runtime, LogLevel.Verbose);
+            }
 
             // while capturing system media there is no beatmap timing to sync to,
             // so drive the beat animation from onsets detected in the captured audio.

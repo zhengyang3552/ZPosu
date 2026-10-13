@@ -11,6 +11,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
+using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Configuration;
 
@@ -62,6 +63,13 @@ namespace osu.Game.Media
         /// </summary>
         public IHasAmplitudes? SystemAudioAmplitudes => source?.AudioAmplitudes;
 
+        /// <summary>
+        /// Whether the captured system audio should provide amplitudes to the game's beat sync.
+        /// This intentionally does not require metadata availability, as the audio capture works independently
+        /// from (and may be ready before) the system media metadata session.
+        /// </summary>
+        public bool AmplitudesActive => captureEnabled.Value && SystemAudioAmplitudes != null;
+
         private SystemMediaCoverStore coverStore = null!;
         private TextureStore? coverTextureStore;
         private SystemMediaTrack? lastTrack;
@@ -78,11 +86,36 @@ namespace osu.Game.Media
             base.LoadComplete();
 
             if (source == null)
+            {
+                Logger.Log("System media capture is unavailable on this platform.", LoggingTarget.Runtime, LogLevel.Important);
                 return;
+            }
 
             source.TrackChanged += onTrackChanged;
             source.PlayingChanged += onPlayingChanged;
             source.Start();
+
+            Logger.Log($"System media capture initialised: enabled={captureEnabled.Value} available={source.Available} audioAmplitudes={source.AudioAmplitudes != null}", LoggingTarget.Runtime, LogLevel.Important);
+
+            Scheduler.AddDelayed(logDiagnostics, 5000, true);
+        }
+
+        private void logDiagnostics()
+        {
+            if (!captureEnabled.Value)
+                return;
+
+            ChannelAmplitudes amplitudes = SystemAudioAmplitudes?.CurrentAmplitudes ?? ChannelAmplitudes.Empty;
+
+            float maxBin = 0;
+
+            foreach (float bin in amplitudes.FrequencyAmplitudes.Span)
+            {
+                if (bin > maxBin)
+                    maxBin = bin;
+            }
+
+            Logger.Log($"System media capture state: available={source?.Available == true} active={Active} peak={amplitudes.Maximum:0.0000} maxBin={maxBin:0.0000} track=\"{CurrentTrack.Value?.Title ?? string.Empty}\" cover={CoverTexture.Value != null}", LoggingTarget.Runtime, LogLevel.Verbose);
         }
 
         private void onTrackChanged(SystemMediaTrack? track) => Schedule(() => updateTrack(track));

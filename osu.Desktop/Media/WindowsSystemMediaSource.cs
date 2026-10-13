@@ -60,6 +60,8 @@ namespace osu.Desktop.Media
 
                 manager = newManager;
                 bindSession(newManager.GetCurrentSession());
+
+                Logger.Log($"System media metadata (SMTC) initialised; current session: {newManager.GetCurrentSession()?.SourceAppUserModelId ?? "none"}", LoggingTarget.Runtime, LogLevel.Important);
             }
             catch (Exception e)
             {
