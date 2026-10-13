@@ -129,13 +129,13 @@ namespace osu.Desktop.Media
                 lock (processingLock)
                     pushMono(monoScratch.AsSpan(0, frames), frames);
             }
-            catch (Exception e)
+            catch (Exception exception)
             {
                 // never let capture failures propagate into the audio thread, but surface them once for diagnosis.
                 if (!reportedError)
                 {
                     reportedError = true;
-                    Logger.Log($"System audio capture failed while processing audio: {e}", LoggingTarget.Runtime, LogLevel.Important);
+                    Logger.Log($"System audio capture failed while processing audio: {exception}", LoggingTarget.Runtime, LogLevel.Important);
                 }
             }
         }
