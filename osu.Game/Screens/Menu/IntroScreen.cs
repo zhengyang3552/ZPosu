@@ -306,8 +306,8 @@ namespace osu.Game.Screens.Menu
 
         protected void StartTrack()
         {
-            // while capturing system media, don't play the intro track (the system player takes over).
-            if (systemMediaCapture?.Active == true)
+            // while system media capture is enabled, don't play the intro track (the system player takes over).
+            if (systemMediaCapture?.CaptureRequested == true)
                 return;
 
             var drawableTrack = musicController.CurrentTrack;

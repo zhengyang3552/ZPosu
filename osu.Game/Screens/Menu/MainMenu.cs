@@ -228,8 +228,8 @@ namespace osu.Game.Screens.Menu
             base.OnEntering(e);
             Buttons.FadeInFromZero(500);
 
-            // while capturing system media, the intro track is left alone (the system player takes over).
-            if (e.Last is IntroScreen && musicController.TrackLoaded && systemMediaCapture?.Active != true)
+            // while system media capture is enabled, the intro track is left alone (the system player takes over).
+            if (e.Last is IntroScreen && musicController.TrackLoaded && systemMediaCapture?.CaptureRequested != true)
             {
                 var track = musicController.CurrentTrack;
 

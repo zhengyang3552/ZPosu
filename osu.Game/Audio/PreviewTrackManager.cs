@@ -117,8 +117,8 @@ namespace osu.Game.Audio
 
             protected override Track GetTrack()
             {
-                // while capturing system media, previews are silenced so they don't play over the system player.
-                if (systemMediaCapture?.Active == true)
+                // while system media capture is enabled, previews are silenced so they don't play over the system player.
+                if (systemMediaCapture?.CaptureRequested == true)
                     return new TrackVirtual(1000);
 
                 return trackManager.Get($"https://b.ppy.sh/preview/{beatmapSetInfo.OnlineID}.mp3");

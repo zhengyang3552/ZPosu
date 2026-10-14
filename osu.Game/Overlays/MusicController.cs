@@ -43,6 +43,12 @@ namespace osu.Game.Overlays
         /// </summary>
         private bool captureActive => systemMediaCapture?.Active == true;
 
+        /// <summary>
+        /// Whether the user has system media capture enabled. In-game music playback is suppressed based on this
+        /// (rather than <see cref="captureActive"/>) so that no music starts before the platform backend is ready.
+        /// </summary>
+        private bool captureRequested => captureEnabled.Value;
+
         private readonly BindableBool captureEnabled = new BindableBool();
 
         /// <summary>
@@ -116,9 +122,18 @@ namespace osu.Game.Overlays
 
             captureEnabled.BindValueChanged(enabled =>
             {
-                // when capture is enabled, the system player takes over and in-game music should pause.
-                if (enabled.NewValue && IsPlaying)
-                    Stop();
+                if (enabled.NewValue)
+                {
+                    // when capture is enabled, the system player takes over and in-game music should pause.
+                    if (IsPlaying)
+                        Stop();
+
+                    return;
+                }
+
+                // capture was switched off; resume in-game music unless another screen owns the track or the user paused it.
+                if (AllowTrackControl.Value && !beatmap.Disabled && !UserPauseRequested)
+                    EnsurePlayingSomething();
             });
         }
 
@@ -164,7 +179,7 @@ namespace osu.Game.Overlays
         /// </summary>
         public void EnsurePlayingSomething()
         {
-            if (captureActive)
+            if (captureRequested)
                 return;
 
             if (UserPauseRequested) return;
@@ -199,7 +214,7 @@ namespace osu.Game.Overlays
             // while capturing system media, in-game music playback is suppressed entirely;
             // the system player is the sole source of music (this also covers song select's
             // automatic preview playback, which is issued as a `Play` call).
-            if (captureActive)
+            if (captureRequested)
                 return false;
 
             if (requestedByUser && !AllowTrackControl.Value)
@@ -240,9 +255,11 @@ namespace osu.Game.Overlays
         /// <returns>Whether the operation was successful.</returns>
         public bool TogglePause()
         {
-            if (captureActive)
+            if (captureRequested)
             {
-                systemMediaCapture!.TogglePlay();
+                if (captureActive)
+                    systemMediaCapture!.TogglePlay();
+
                 return true;
             }
 
@@ -264,9 +281,11 @@ namespace osu.Game.Overlays
         /// <param name="allowProtectedTracks">Whether to include <see cref="BeatmapSetInfo.Protected"/> beatmap sets when navigating.</param>
         public void PreviousTrack(Action<PreviousTrackResult>? onSuccess = null, bool allowProtectedTracks = false) => Schedule(() =>
         {
-            if (captureActive)
+            if (captureRequested)
             {
-                systemMediaCapture!.Previous();
+                if (captureActive)
+                    systemMediaCapture!.Previous();
+
                 return;
             }
 
@@ -323,9 +342,11 @@ namespace osu.Game.Overlays
         /// <returns>A <see cref="ScheduledDelegate"/> of the operation.</returns>
         public void NextTrack(Action? onSuccess = null, bool allowProtectedTracks = false) => Schedule(() =>
         {
-            if (captureActive)
+            if (captureRequested)
             {
-                systemMediaCapture!.Next();
+                if (captureActive)
+                    systemMediaCapture!.Next();
+
                 return;
             }
 

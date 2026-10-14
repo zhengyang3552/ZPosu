@@ -73,7 +73,11 @@ namespace osu.Desktop.Media
         }
 
         private void onCurrentSessionChanged(GlobalSystemMediaTransportControlsSessionManager sender, CurrentSessionChangedEventArgs args)
-            => bindSession(getPreferredSession(sender));
+        {
+            // session enumeration is deferred off the event callback thread, as querying sessions from within
+            // the event can be re-entrant into the platform API.
+            _ = Task.Run(() => bindSession(getPreferredSession(sender)));
+        }
 
         /// <summary>
         /// Picks the session which should be treated as the currently playing system media.

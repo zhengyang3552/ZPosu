@@ -17,7 +17,6 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Input.Events;
-using osu.Framework.Logging;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Graphics.Backgrounds;
@@ -294,9 +293,9 @@ namespace osu.Game.Screens.Menu
         {
             base.OnNewBeat(beatIndex, timingPoint, effectPoint, amplitudes);
 
-            // while capturing system media the menu's own beatmap timing is irrelevant;
-            // beats are derived from the captured system audio instead (see updateCaptureBeats).
-            if (systemMediaCapture?.Active == true)
+            // while the system audio drives the amplitudes the menu's own beatmap timing is irrelevant;
+            // beats are derived from the captured audio instead (see updateCaptureBeats).
+            if (systemMediaCapture?.AmplitudesActive == true)
                 return;
 
             lastBeatIndex = beatIndex;
@@ -384,8 +383,6 @@ namespace osu.Game.Screens.Menu
 
         private double lastCaptureBeatTime;
 
-        private double lastDiagnosticTime;
-
         protected override void Update()
         {
             base.Update();
@@ -396,15 +393,9 @@ namespace osu.Game.Screens.Menu
             // system audio's amplitudes, otherwise the in-game track's amplitudes.
             ChannelAmplitudes amplitudes = BeatSyncSource.CurrentAmplitudes;
 
-            if (Time.Current - lastDiagnosticTime > 5000 && systemMediaCapture?.CaptureEnabled.Value == true)
-            {
-                lastDiagnosticTime = Time.Current;
-                Logger.Log($"Menu visualiser amplitude source: provider={BeatSyncSource.GetType().Name} max={amplitudes.Maximum:0.0000}", LoggingTarget.Runtime, LogLevel.Verbose);
-            }
-
-            // while capturing system media there is no beatmap timing to sync to,
+            // while the system audio is driving the amplitudes there is no beatmap timing to sync to,
             // so drive the beat animation from onsets detected in the captured audio.
-            if (systemMediaCapture?.Active == true)
+            if (systemMediaCapture?.AmplitudesActive == true)
                 updateCaptureBeats(amplitudes);
 
             if (musicController.CurrentTrack.IsRunning || amplitudes.Maximum > 0)

@@ -60,6 +60,13 @@ namespace osu.Game.Media
         public bool Active => captureEnabled.Value && source?.Available == true;
 
         /// <summary>
+        /// Whether the user has system media capture enabled.
+        /// Consumers which suppress their own music should use this (rather than <see cref="Active"/>), so that no
+        /// in-game music starts (and keeps playing) before the platform metadata backend has become ready.
+        /// </summary>
+        public bool CaptureRequested => captureEnabled.Value;
+
+        /// <summary>
         /// Real-time amplitude data of the system audio output, if the platform backend supports capturing it.
         /// </summary>
         public IHasAmplitudes? SystemAudioAmplitudes => source?.AudioAmplitudes;
@@ -74,11 +81,26 @@ namespace osu.Game.Media
         private SystemMediaCoverStore coverStore = null!;
         private TextureStore? coverTextureStore;
         private SystemMediaTrack? lastTrack;
+        private SystemMediaTrack? lastSourceTrack;
 
         [BackgroundDependencyLoader]
         private void load(OsuConfigManager config)
         {
             config.BindWith(OsuSetting.CaptureSystemMedia, captureEnabled);
+
+            captureEnabled.BindValueChanged(enabled =>
+            {
+                if (enabled.NewValue)
+                    updateTrack(lastSourceTrack);
+                else
+                {
+                    // drop all captured state so nothing stale drives the UI while the feature is off.
+                    CurrentTrack.Value = null;
+                    CoverTexture.Value = null;
+                    lastTrack = null;
+                }
+            });
+
             coverStore = new SystemMediaCoverStore();
         }
 
@@ -98,7 +120,7 @@ namespace osu.Game.Media
 
             Logger.Log($"System media capture initialised: enabled={captureEnabled.Value} available={source.Available} audioAmplitudes={source.AudioAmplitudes != null}", LoggingTarget.Runtime, LogLevel.Important);
 
-            Scheduler.AddDelayed(logDiagnostics, 5000, true);
+            Scheduler.AddDelayed(logDiagnostics, 30000, true);
         }
 
         private void logDiagnostics()
@@ -119,12 +141,22 @@ namespace osu.Game.Media
             Logger.Log($"System media capture state: available={source?.Available == true} active={Active} peak={amplitudes.Maximum:0.0000} maxBin={maxBin:0.0000} track=\"{CurrentTrack.Value?.Title ?? string.Empty}\" cover={CoverTexture.Value != null}", LoggingTarget.Runtime, LogLevel.Verbose);
         }
 
-        private void onTrackChanged(SystemMediaTrack? track) => Schedule(() => updateTrack(track));
+        private void onTrackChanged(SystemMediaTrack? track) => Schedule(() =>
+        {
+            lastSourceTrack = track;
+            updateTrack(track);
+        });
 
         private void onPlayingChanged(bool playing) => Schedule(() => IsPlaying.Value = playing);
 
         private void updateTrack(SystemMediaTrack? track)
         {
+            if (!captureEnabled.Value)
+            {
+                // the feature is disabled; remembering the track is enough, as it is applied when the feature is enabled.
+                return;
+            }
+
             if (track != null && lastTrack != null && track.Equals(lastTrack) && CoverTexture.Value != null)
                 return;
 
