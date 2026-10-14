@@ -20,7 +20,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 new SettingsCheckbox
                 {
                     LabelText = @"捕获系统音乐",
-                    TooltipText = @"开启后，主菜单背景将跟随系统播放器的封面（获取失败或没有歌曲时显示内置背景），osu! 的播放控件将控制系统的播放；开启期间内置的歌曲选择不可用",
+                    TooltipText = @"开启后，osu! 的播放控件将控制系统播放器，主菜单的频谱与律动会跟随系统音乐；开启期间内置的歌曲选择不可用",
                     Current = config.GetBindable<bool>(OsuSetting.CaptureSystemMedia),
                 },
             };

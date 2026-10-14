@@ -43,8 +43,6 @@ namespace osu.Game.Screens.Backgrounds
         [Resolved(canBeNull: true)]
         private SystemMediaCapture systemMediaCapture { get; set; }
 
-        private Bindable<bool> captureEnabled;
-
         protected virtual bool AllowStoryboardBackground => true;
 
         [BackgroundDependencyLoader]
@@ -54,7 +52,6 @@ namespace osu.Game.Screens.Backgrounds
             skin = skinManager.CurrentSkin.GetBoundCopy();
             source = config.GetBindable<BackgroundSource>(OsuSetting.MenuBackgroundSource);
             introSequence = config.GetBindable<IntroSequence>(OsuSetting.IntroSequence);
-            captureEnabled = config.GetBindable<bool>(OsuSetting.CaptureSystemMedia);
 
             AddInternal(seasonalBackgroundLoader);
         }
@@ -63,36 +60,19 @@ namespace osu.Game.Screens.Backgrounds
         {
             base.LoadComplete();
 
-            user.ValueChanged += _ => Scheduler.AddOnce(refreshCaptureBackground);
-            skin.ValueChanged += _ => Scheduler.AddOnce(refreshCaptureBackground);
-            source.ValueChanged += _ => Scheduler.AddOnce(refreshCaptureBackground);
-            beatmap.ValueChanged += _ => Scheduler.AddOnce(refreshCaptureBackground);
-            introSequence.ValueChanged += _ => Scheduler.AddOnce(refreshCaptureBackground);
-            seasonalBackgroundLoader.SeasonalBackgroundChanged += () => Scheduler.AddOnce(refreshCaptureBackground);
-
-            captureEnabled.BindValueChanged(_ => Scheduler.AddOnce(refreshCaptureBackground));
-
-            if (systemMediaCapture != null)
-            {
-                systemMediaCapture.CurrentTrack.BindValueChanged(_ => Scheduler.AddOnce(refreshCaptureBackground));
-                systemMediaCapture.CoverTexture.BindValueChanged(_ => Scheduler.AddOnce(refreshCaptureBackground));
-            }
+            user.ValueChanged += _ => Scheduler.AddOnce(reloadBackground);
+            skin.ValueChanged += _ => Scheduler.AddOnce(reloadBackground);
+            source.ValueChanged += _ => Scheduler.AddOnce(reloadBackground);
+            beatmap.ValueChanged += _ => Scheduler.AddOnce(reloadBackground);
+            introSequence.ValueChanged += _ => Scheduler.AddOnce(reloadBackground);
+            seasonalBackgroundLoader.SeasonalBackgroundChanged += () => Scheduler.AddOnce(reloadBackground);
 
             currentDisplay = RNG.Next(0, background_count);
 
-            // the initial load always uses the normal background rotation (the capture source is not ready yet).
             loadBackground(createBackground());
 
-            // Reacts to events which should not rotate the system player's track.
-            // While capturing system media with a cover available, the same cover is re-applied (a no-op);
-            // otherwise the normal background rotation is loaded.
-            void refreshCaptureBackground()
-            {
-                if (systemMediaCapture?.Active == true && systemMediaCapture.CoverTexture.Value != null)
-                    loadBackground(new SystemMediaBackground(systemMediaCapture.CoverTexture.Value));
-                else
-                    loadBackground(createBackground());
-            }
+            // these events should not rotate the system player's track (that only happens when the user requests the next background).
+            void reloadBackground() => loadBackground(createBackground());
         }
 
         private ScheduledDelegate storyboardUnloadDelegate;
@@ -131,8 +111,7 @@ namespace osu.Game.Screens.Backgrounds
         {
             if (systemMediaCapture?.Active == true)
             {
-                // while capturing system media the background follows the system player,
-                // so "next background" cycles the system track instead.
+                // while capturing system media, requesting the next background cycles the system player's track instead.
                 systemMediaCapture.Next();
                 return false;
             }
